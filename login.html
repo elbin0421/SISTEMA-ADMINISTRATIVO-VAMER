@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VAMER — Acceso</title>
+    <link rel="stylesheet" href="assets/css/login.css">
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <div class="logo-hex">V</div>
+      <h1>VAMER</h1>
+      <p>Ventas America S. de R.L</p>
+    </div>
+    <form id="loginForm" novalidate>
+      <label for="usuario">Usuario</label>
+      <input type="text" id="usuario" name="usuario" autocomplete="username"
+             placeholder="Tu usuario" inputmode="text" required>
+      <label for="password">Contraseña</label>
+      <input type="password" id="password" name="password" autocomplete="current-password"
+             placeholder="••••••••" required>
+      <button type="submit" id="btnLogin">Ingresar</button>
+    </form>
+    <div class="error" id="errorMsg"></div>
+  </div>
+
+    <script src="assets/js/login.js"></script>
+</body>
+</html>

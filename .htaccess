@@ -1,0 +1,15 @@
+Options -Indexes
+
+# Pasar cabecera Authorization a PHP
+SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
+
+# Redirigir todo a index excepto archivos y carpetas reales
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^api/(.*)$ api/$1 [L]
+
+# Bloquear acceso directo a carpetas sensibles
+RedirectMatch 403 ^/admin/config/
+RedirectMatch 403 ^/admin/models/
+RedirectMatch 403 ^/admin/helpers/
