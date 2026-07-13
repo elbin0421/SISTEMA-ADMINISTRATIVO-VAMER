@@ -117,8 +117,8 @@ class PlanillaModel {
     public static function generar(int $mes, int $anio, string $quincena, string $fecha_pago, string $observaciones, array $extrasMap, int $usuario_id, int $excluirId = 0, int $empresa_id = 0): int {
         $pdo = getDB();
 
-        $sql = "SELECT id_planilla FROM planillas WHERE periodo_mes=? AND periodo_anio=? AND quincena=?";
-        $params = [$mes, $anio, $quincena];
+        $sql = "SELECT id_planilla FROM planillas WHERE periodo_mes=? AND periodo_anio=? AND quincena=? AND (empresa_id = ? OR (empresa_id IS NULL AND ? = 0))";
+        $params = [$mes, $anio, $quincena, $empresa_id ?: null, $empresa_id];
         if ($excluirId > 0) {
             $sql .= " AND id_planilla != ?";
             $params[] = $excluirId;
@@ -126,7 +126,8 @@ class PlanillaModel {
         $chk = $pdo->prepare($sql);
         $chk->execute($params);
         if ($chk->fetch()) {
-            throw new Exception("Ya existe la planilla de la {$quincena} quincena de " . self::nombreMes($mes) . " $anio.");
+            $empNombre = $empresa_id === 1 ? 'SOLDYMEG' : ($empresa_id === 2 ? 'VAMER' : '');
+            throw new Exception("Ya existe la planilla de la {$quincena} quincena de " . self::nombreMes($mes) . " $anio" . ($empNombre ? " para $empNombre" : "") . ".");
         }
 
         $empleados = EmpleadoModel::listar('activo', '', $empresa_id);
@@ -146,8 +147,8 @@ class PlanillaModel {
                   (periodo_mes, periodo_anio, quincena, fecha_pago,
                    total_salarios, total_ihss_emp, total_ihss_pat,
                    total_rap, total_isr, total_seguro,
-                   total_deducciones, total_neto, observaciones, estado, usuario_id)
-                VALUES (?,?,?,?,?,0,0,0,0,?,?,?,?,'borrador',?)
+                   total_deducciones, total_neto, observaciones, estado, usuario_id, empresa_id)
+                VALUES (?,?,?,?,?,0,0,0,0,?,?,?,?,'borrador',?,?)
             ")->execute([
                 $mes, $anio, $quincena, $fecha_pago,
                 $totales['total_salarios'],
@@ -156,6 +157,7 @@ class PlanillaModel {
                 $totales['total_neto'],
                 $observaciones,
                 $usuario_id,
+                $empresa_id ?: null,
             ]);
             $planilla_id = (int)$pdo->lastInsertId();
 
@@ -203,15 +205,22 @@ class PlanillaModel {
         }
     }
 
-    public static function listar(): array {
-        $stmt = getDB()->prepare("
+    public static function listar(int $empresa_id = 0): array {
+        $pdo    = getDB();
+        $where  = "WHERE p.quincena NOT IN ('catorceavo','aguinaldo')";
+        $params = [];
+        if ($empresa_id) { $where .= ' AND p.empresa_id = ?'; $params[] = $empresa_id; }
+        $stmt = $pdo->prepare("
             SELECT p.*, u.nombre AS usuario,
+                   emp.nombre AS empresa_nombre,
                    (SELECT COUNT(*) FROM detalle_planilla dp WHERE dp.planilla_id = p.id_planilla) AS total_empleados
             FROM planillas p
             JOIN usuarios u ON u.id_usuario = p.usuario_id
+            LEFT JOIN empresas emp ON emp.id_empresa = p.empresa_id
+            $where
             ORDER BY p.periodo_anio DESC, p.periodo_mes DESC, p.quincena DESC
         ");
-        $stmt->execute();
+        $stmt->execute($params);
         return $stmt->fetchAll();
     }
 

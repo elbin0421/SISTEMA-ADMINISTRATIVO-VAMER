@@ -3249,7 +3249,8 @@ function selQuincena(q) {
 
 async function cargarPlanillas() {
   document.getElementById('tablaPlanillas').innerHTML = '<p class="loading">Cargando...</p>';
-  const r = await api('controllers/PlanillaController.php?action=listar');
+  const empId = document.getElementById('planFiltroEmpresa')?.value || '';
+  const r = await api('controllers/PlanillaController.php?action=listar' + (empId ? '&empresa_id='+empId : ''));
   if (!r.ok) { document.getElementById('tablaPlanillas').innerHTML = '<p style="color:var(--danger)">Error.</p>'; return; }
   planillasData = r.data.data;
   if (planillasData.length) {
@@ -3266,15 +3267,16 @@ function renderTablaPlanillas(rows) {
   const meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   const pag = paginar('planillas_list', rows);
   let h = `<table><thead><tr>
-    <th>Período</th><th>Quincena</th><th>Fecha Pago</th>
+    <th>Período</th><th>Empresa</th><th>Quincena</th><th>Fecha Pago</th>
     <th>Total Salarios</th><th>Deducciones</th><th>Neto a Pagar</th>
     <th>Estado</th><th>Acciones</th>
   </tr></thead><tbody>`;
-  if (!pag.slice.length) h += '<tr><td colspan="8" class="empty-state">Sin planillas generadas</td></tr>';
+  if (!pag.slice.length) h += '<tr><td colspan="9" class="empty-state">Sin planillas generadas</td></tr>';
   pag.slice.forEach(p => {
     const periodo = (meses[+p.periodo_mes]||'') + ' ' + p.periodo_anio;
     h += `<tr>
       <td><strong>${periodo}</strong></td>
+      <td>${p.empresa_nombre ? `<span class="badge badge-green">${p.empresa_nombre}</span>` : '—'}</td>
       <td><span class="badge badge-blue">${p.quincena||'1ra'} Quincena</span></td>
       <td>${p.fecha_pago}</td>
       <td>${fmtMoneda(p.total_salarios)}</td>
@@ -3403,11 +3405,11 @@ function renderExtrasTable() {
       <td><input type="number" min="0" step="0.01"
           value="${es2da ? (e.viatico_s3||0) : (e.viatico_s1||0)}"
           style="${style};border-color:rgba(232,160,32,.5)"
-          onchange="extrasChange(${i}, es2da ? 'viatico_s3' : 'viatico_s1', this.value)"></td>
+          onchange="extrasChange(${i}, '${es2da ? 'viatico_s3' : 'viatico_s1'}', this.value)"></td>
       <td><input type="number" min="0" step="0.01"
           value="${es2da ? (e.viatico_s4||0) : (e.viatico_s2||0)}"
           style="${style};border-color:rgba(232,160,32,.5)"
-          onchange="extrasChange(${i}, es2da ? 'viatico_s4' : 'viatico_s2', this.value)"></td>
+          onchange="extrasChange(${i}, '${es2da ? 'viatico_s4' : 'viatico_s2'}', this.value)"></td>
       <td style="text-align:center">
         <div style="font-size:11px;color:var(--muted);margin-bottom:3px">${es2da ? fmtMoneda(montoSeguro) : '—'}</div>
         <input type="checkbox" style="${chkStyle}" ${checked ? 'checked' : ''} ${!es2da ? 'disabled title="Solo aplica en 2da quincena"' : ''}
@@ -3530,11 +3532,15 @@ async function editarPlanilla(id) {
   document.getElementById('planAnio').value      = p.periodo_anio;
   document.getElementById('planFechaPago').value = p.fecha_pago;
   document.getElementById('planObs').value       = p.observaciones || '';
+  // Setear empresa de la planilla en el filtro
+  const filtroEmp = document.getElementById('planFiltroEmpresa');
+  if (filtroEmp) filtroEmp.value = p.empresa_id || '';
 
   // Reconstruir extras desde detalle guardado — PRESERVANDO todos los valores
   planEmpleadosExtras = (p.detalle || []).map(d => ({
     empleado_id:    d.empleado_id,
     nombre:         d.empleado,
+    empresa_nombre: d.empresa_nombre || '',
     ubicacion:      d.ubicacion || 'SOLDYMEG',
     salario_mensual:(parseFloat(d.salario_base) * 2),
     seguro_privado: parseFloat(d.seguro_privado || 0),
@@ -3542,6 +3548,10 @@ async function editarPlanilla(id) {
     dias_faltados:  parseFloat(d.dias_faltados  || 0),
     abono_prestamo: parseFloat(d.abono_prestamo || 0),
     abono_vale:     parseFloat(d.abono_vale     || 0),
+    viatico_s1:     parseFloat(d.viatico_s1     || 0),
+    viatico_s2:     parseFloat(d.viatico_s2     || 0),
+    viatico_s3:     parseFloat(d.viatico_s3     || 0),
+    viatico_s4:     parseFloat(d.viatico_s4     || 0),
     aplicar_seguro: d.aplicar_seguro !== undefined
       ? !!+d.aplicar_seguro
       : (parseFloat(d.seguro_privado || 0) > 0),

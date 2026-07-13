@@ -20,7 +20,6 @@ match(true) {
     $action === 'planilla_pdf'                              => planillaPDF(),
     $action === 'planilla_excel'                            => planillaExcel(),
     $action === 'inventario' || $action === 'inventario_mov'=> reporteInventario($format),
-    $action === 'inventario_stock'                          => inventarioStock($format),
     $action === 'rentabilidad'||$action==='rentabilidad_ot' => reporteRentabilidad($format),
     default => jsonResponder(400, ['error' => 'Accion no valida'])
 };
@@ -103,7 +102,7 @@ function planillaPDF(): void {
         .'<div class="box">Deducciones<strong>'.$f($p['total_deducciones']).'</strong></div>'
         .'<div class="box">Neto a pagar<strong>'.$f($p['total_neto']).'</strong></div>'
         .'</div>';
-    echo '<table><thead><tr><th>Empleado</th><th>Ubic.</th><th>Sal.Quincenal</th><th>H.Extra</th><th>Mto.HE</th><th>D.Falt.</th><th>Desc.Falt.</th>';
+    echo '<table><thead><tr><th>Empleado</th><th>Ubic.</th><th>Sal.Quincenal</th><th>H.Extra</th><th>Mto.HE</th><th style="color:#e8a020">Viáticos</th><th>D.Falt.</th><th>Desc.Falt.</th>';
     if($mostrarSeguro) echo '<th>Seguro</th>';
     echo '<th>Abo.Prest.</th><th>Abo.Vale</th><th>Total Ded.</th><th>NETO</th></tr></thead><tbody>';
     foreach($p['detalle'] as $d){
@@ -113,6 +112,7 @@ function planillaPDF(): void {
             .'<td>'.$f($d['salario_base']).'</td>'
             .'<td style="text-align:center">'.((float)($d['horas_extra']??0)>0?$d['horas_extra']:'—').'</td>'
             .'<td>'.((float)($d['monto_horas_extra']??0)>0?$f($d['monto_horas_extra']):'—').'</td>'
+            .'<td style="color:#b07d00;font-weight:600">'.($f((float)($d['viatico_s1']??0)+(float)($d['viatico_s2']??0)+(float)($d['viatico_s3']??0)+(float)($d['viatico_s4']??0))).'</td>'
             .'<td style="text-align:center">'.((float)($d['dias_faltados']??0)>0?$d['dias_faltados']:'—').'</td>'
             .'<td>'.((float)($d['monto_dias_faltados']??0)>0?$f($d['monto_dias_faltados']):'—').'</td>';
         if($mostrarSeguro) echo '<td>'.$f($d['seguro_privado']).'</td>';
@@ -123,7 +123,7 @@ function planillaPDF(): void {
             .'</tr>';
     }
     echo '<tr class="tot"><td class="l" colspan="2"><strong>TOTALES</strong></td>'
-        .'<td>'.$f($p['total_salarios']).'</td><td colspan="4">—</td>';
+        .'<td>'.$f($p['total_salarios']).'</td><td colspan="2">—</td><td>'.$f(array_sum(array_column($p['detalle'],'viatico_s1'))+array_sum(array_column($p['detalle'],'viatico_s2'))+array_sum(array_column($p['detalle'],'viatico_s3'))+array_sum(array_column($p['detalle'],'viatico_s4'))).'</td><td colspan="2">—</td>';
     if($mostrarSeguro) echo '<td>'.$f($p['total_seguro']).'</td>';
     echo '<td colspan="2">—</td><td>'.$f($p['total_deducciones']).'</td><td>'.$f($p['total_neto']).'</td></tr>';
     echo '</tbody></table>';
@@ -148,18 +148,20 @@ function planillaExcel(): void {
     fputcsv($out,["SOLDYMEG - Planilla {$quincena} Quincena - {$mes} {$p['periodo_anio']}"]);
     fputcsv($out,['Fecha pago: '.$p['fecha_pago'],'Estado: '.$p['estado']]);
     fputcsv($out,[]);
-    $cab=['Empleado','Puesto','Ubicacion','Sal. Quincenal','Horas Extra','Monto HE','Dias Faltados','Desc. Faltados'];
+    $cab=['Empleado','Puesto','Ubicacion','Sal. Quincenal','Horas Extra','Monto HE','Viaticos','Dias Faltados','Desc. Faltados'];
     if($quincena==='2da') $cab[]='Seguro';
     array_push($cab,'Abono Prestamo','Abono Vale','Total Deducciones','Neto a Pagar');
     fputcsv($out,$cab);
     foreach($p['detalle'] as $d){
-        $fila=[$d['empleado'],$d['puesto']??'',$d['ubicacion']??'',$d['salario_base'],$d['horas_extra']??0,$d['monto_horas_extra']??0,$d['dias_faltados']??0,$d['monto_dias_faltados']??0];
+        $vt2=((float)($d['viatico_s1']??0)+(float)($d['viatico_s2']??0)+(float)($d['viatico_s3']??0)+(float)($d['viatico_s4']??0));
+        $fila=[$d['empleado'],$d['puesto']??'',$d['ubicacion']??'',$d['salario_base'],$d['horas_extra']??0,$d['monto_horas_extra']??0,$vt2,$d['dias_faltados']??0,$d['monto_dias_faltados']??0];
         if($quincena==='2da') $fila[]=$d['seguro_privado']??0;
         array_push($fila,$d['abono_prestamo']??0,$d['abono_vale']??0,$d['total_deducciones'],$d['salario_neto']);
         fputcsv($out,$fila);
     }
     fputcsv($out,[]);
-    $tot=['TOTALES','','',$p['total_salarios'],'','','',''];
+    $vtot=array_sum(array_column($p['detalle'],'viatico_s1'))+array_sum(array_column($p['detalle'],'viatico_s2'))+array_sum(array_column($p['detalle'],'viatico_s3'))+array_sum(array_column($p['detalle'],'viatico_s4'));
+    $tot=['TOTALES','','',$p['total_salarios'],'','',$vtot,'',''];
     if($quincena==='2da') $tot[]=$p['total_seguro'];
     array_push($tot,'','',$p['total_deducciones'],$p['total_neto']);
     fputcsv($out,$tot);
@@ -168,116 +170,6 @@ function planillaExcel(): void {
 }
 
 // ── Excel genérico ────────────────────────────────────────────
-function inventarioStock(string $format): void {
-    $categoria = $_GET['categoria'] ?? '';
-    $estado     = $_GET['estado']    ?? '';   // 'bajo' = stock bajo mínimo
-    $pdo = getDB();
-
-    $where  = 'WHERE 1=1';
-    $params = [];
-    if ($categoria) { $where .= ' AND c.nombre = ?'; $params[] = $categoria; }
-    if ($estado === 'bajo') { $where .= ' AND mat.stock <= mat.stock_minimo'; }
-
-    $stmt = $pdo->prepare("
-        SELECT mat.codigo             AS 'Código',
-               mat.nombre             AS 'Material',
-               c.nombre               AS 'Categoría',
-               mat.unidad_medida      AS 'Unidad',
-               mat.stock              AS 'Stock Actual',
-               mat.stock_minimo       AS 'Stock Mínimo',
-               mat.precio_compra      AS 'P. Compra (L.)',
-               mat.precio_venta       AS 'P. Venta (L.)',
-               ROUND(mat.stock * mat.precio_compra, 2) AS 'Valor en Stock (L.)',
-               CASE WHEN mat.stock <= mat.stock_minimo THEN 'BAJO' ELSE 'OK' END AS 'Estado Stock',
-               mat.descripcion        AS 'Descripción'
-        FROM materiales mat
-        LEFT JOIN categorias_material c ON c.id_categoria = mat.categoria_id
-        $where
-        ORDER BY c.nombre ASC, mat.nombre ASC
-    ");
-    $stmt->execute($params);
-    $rows = $stmt->fetchAll();
-
-    // Totales para resumen
-    $totalValor = array_sum(array_column($rows, 'Valor en Stock (L.)'));
-    $totalItems = count($rows);
-    $bajosStock = count(array_filter($rows, fn($r) => $r['Estado Stock'] === 'BAJO'));
-
-    if ($format === 'excel') {
-        exportarExcel($rows, 'inventario_stock', 'Inventario_Stock_' . date('Y-m-d'));
-        return;
-    }
-
-    // ── PDF (HTML para imprimir / abrir en nueva pestaña) ──
-    $f  = fn($n) => 'L. ' . number_format((float)$n, 2, '.', ',');
-    $fc = fn($n) => number_format((float)$n, 2, '.', ',');
-    header('Content-Type: text/html; charset=UTF-8');
-    echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-<title>Inventario — SOLDYMEG</title>
-<style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:Arial,sans-serif;font-size:9.5px;color:#1a1a2e;background:#fff;padding:14px}
-  h2{font-size:14px;text-align:center;margin-bottom:2px}
-  .sub{text-align:center;color:#555;font-size:9px;margin-bottom:10px}
-  .boxes{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap}
-  .box{border:1px solid #ccc;border-radius:5px;padding:7px 14px;text-align:center;flex:1;min-width:110px}
-  .box strong{display:block;font-size:13px;margin-top:2px}
-  .box.warn strong{color:#c0392b}
-  table{width:100%;border-collapse:collapse;font-size:8.8px}
-  thead th{background:#1a1a2e;color:#fff;padding:4px 3px;text-align:center;white-space:nowrap}
-  td{border:1px solid #ddd;padding:3px 4px;vertical-align:middle}
-  td.r{text-align:right} td.c{text-align:center}
-  tr:nth-child(even){background:#f7f7f7}
-  .bajo{background:#fdecea!important;color:#c0392b;font-weight:700}
-  .footer{margin-top:10px;font-size:8.5px;color:#888;text-align:center}
-  @media print{body{padding:6px}button{display:none}}
-</style></head><body>';
-
-    echo '<h2>📦 SOLDYMEG — Inventario de Materiales</h2>';
-    echo '<div class="sub">Generado: ' . date('d/m/Y H:i') . ($categoria ? ' | Categoría: ' . htmlspecialchars($categoria) : '') . ($estado === 'bajo' ? ' | Solo stock bajo mínimo' : '') . '</div>';
-
-    echo '<div class="boxes">'
-        . '<div class="box"><span>Total materiales</span><strong>' . $totalItems . '</strong></div>'
-        . '<div class="box warn"><span>Stock bajo mínimo</span><strong>' . $bajosStock . '</strong></div>'
-        . '<div class="box"><span>Valor total inventario</span><strong>' . $f($totalValor) . '</strong></div>'
-        . '</div>';
-
-    echo '<table><thead><tr>
-        <th>#</th><th>Código</th><th>Material</th><th>Categoría</th><th>Unidad</th>
-        <th>Stock</th><th>Mínimo</th><th>P.Compra</th><th>P.Venta</th>
-        <th>Valor Stock</th><th>Estado</th>
-    </tr></thead><tbody>';
-
-    foreach ($rows as $i => $r) {
-        $bajo    = $r['Estado Stock'] === 'BAJO';
-        $trClass = $bajo ? ' class="bajo"' : '';
-        echo "<tr{$trClass}>"
-            . '<td class="c">' . ($i + 1) . '</td>'
-            . '<td class="c"><code>' . htmlspecialchars($r['Código'] ?? '—') . '</code></td>'
-            . '<td>' . htmlspecialchars($r['Material']) . '</td>'
-            . '<td class="c">' . htmlspecialchars($r['Categoría'] ?? '—') . '</td>'
-            . '<td class="c">' . htmlspecialchars($r['Unidad']) . '</td>'
-            . '<td class="r">' . $fc($r['Stock Actual']) . '</td>'
-            . '<td class="r c">' . $fc($r['Stock Mínimo']) . '</td>'
-            . '<td class="r">' . $f($r['P. Compra (L.)']) . '</td>'
-            . '<td class="r">' . $f($r['P. Venta (L.)']) . '</td>'
-            . '<td class="r"><strong>' . $f($r['Valor en Stock (L.)']) . '</strong></td>'
-            . '<td class="c ' . ($bajo ? 'bajo' : '') . '">' . ($bajo ? '⚠ BAJO' : '✔ OK') . '</td>'
-            . '</tr>';
-    }
-
-    // Fila de totales
-    echo '<tr style="background:#e8f4e8;font-weight:bold">'
-        . '<td colspan="9" style="text-align:right;padding:4px 6px">VALOR TOTAL INVENTARIO</td>'
-        . '<td class="r">' . $f($totalValor) . '</td>'
-        . '<td></td></tr>';
-
-    echo '</tbody></table>';
-    echo '<div class="footer">SOLDYMEG &mdash; Reporte generado el ' . date('d/m/Y \a \l\a\s H:i') . '</div>';
-    echo '</body></html>';
-    exit;
-}
-
 function exportarExcel(array $rows, string $tipo, string $filename): void {
     header('Content-Type: text/csv; charset=UTF-8');
     header('Content-Disposition: attachment; filename="'.$filename.'.csv"');

@@ -25,7 +25,8 @@ match(true) {
 };
 
 function listar(): void {
-    responder(200, ['ok' => true, 'data' => PlanillaModel::listar()]);
+    $empresa_id = (int)($_GET['empresa_id'] ?? 0);
+    responder(200, ['ok' => true, 'data' => PlanillaModel::listar($empresa_id)]);
 }
 function obtener(): void {
     $id = (int)($_GET['id'] ?? 0);
