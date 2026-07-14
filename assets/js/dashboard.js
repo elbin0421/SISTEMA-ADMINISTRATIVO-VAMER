@@ -5,9 +5,10 @@ const MODULE_GROUP = {
   usuarios: 'admin', roles: 'admin',
   clientes: 'operaciones', inventario: 'operaciones', compras: 'operaciones',
   proveedores: 'operaciones', ordenes: 'operaciones',
+  vehiculos: 'operaciones', requisiciones: 'operaciones',
   cotizaciones: 'comercial', facturacion: 'comercial', cai: 'comercial',
-  libro_ventas: 'comercial', pagos: 'comercial',
-  planillas: 'rrhh',
+  libro_ventas: 'comercial', pagos: 'comercial', gastos: 'comercial', catalogo: 'comercial',
+  planillas: 'rrhh', vacaciones: 'rrhh',
   reportes: 'analisis',
 };
 
@@ -37,14 +38,15 @@ function toggleGrupo(grpId, forceOpen = null) {
 function marcarGrupoActivo(modulo) {
   document.querySelectorAll('.nav-group').forEach(g => g.classList.remove('has-active'));
   const grpId = MODULE_GROUP[modulo];
+  if (!document.body.classList.contains('sb-mini')) {
+    document.querySelectorAll('.nav-group-body').forEach(b => b.classList.remove('open'));
+    document.querySelectorAll('.nav-group-header').forEach(h => h.classList.remove('open'));
+  }
   if (grpId) {
     const grp = document.getElementById('grp-' + grpId);
     if (grp) {
       grp.classList.add('has-active');
-      // Abrir el grupo solo si el sidebar está expandido
-      if (!document.body.classList.contains('sb-mini')) {
-        toggleGrupo(grpId, true);
-      }
+      if (!document.body.classList.contains('sb-mini')) toggleGrupo(grpId, true);
     }
   }
 }
@@ -93,6 +95,8 @@ document.querySelectorAll('.nav-item[data-module]').forEach(el => {
     this.classList.add('active');
     document.getElementById('mod-' + mod).classList.add('active');
     document.getElementById('topbarTitle').textContent = modTitles[mod] || mod;
+    document.getElementById('main')?.scrollTo(0, 0);
+    window.scrollTo(0, 0);
     marcarGrupoActivo(mod);
     // En mobile colapsar al navegar
     if (isMobile()) document.body.classList.add('sb-mini');
@@ -1649,7 +1653,7 @@ function filtrarCotizaciones() {
 
 function renderTablaCotizaciones(rows) {
   const pag = paginar('cotizaciones', rows);
-  let h = '<table><thead><tr><th>Número</th><th>Cliente</th><th>OT Origen</th><th>OT Cliente</th><th>OC</th><th>Modo</th><th>Fecha</th><th>Total</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>';
+  let h = '<table><thead><tr><th>Número</th><th>Cliente</th><th>Unidad</th><th>OT Cliente</th><th>OC</th><th>Modo</th><th>Fecha</th><th>Total</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>';
   if (!pag.slice.length) h += '<tr><td colspan="8" class="empty-state">Sin cotizaciones</td></tr>';
   pag.slice.forEach(c => {
     const estadosBtns=[];
@@ -1663,7 +1667,7 @@ function renderTablaCotizaciones(rows) {
     h += `<tr>
       <td><strong>${c.numero_cotizacion}</strong></td>
       <td>${c.cliente}</td>
-      <td>${c.numero_orden || '<span style="color:var(--muted)">Directa</span>'}</td>
+      <td>${c.unidad ? `<span class="badge ${c.unidad==='VESTA'?'badge-blue':'badge-gray'}">${c.unidad}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
       <td><span style="font-family:monospace;font-size:12px">${c.ot_cliente || '<span style="color:var(--muted)">—</span>'}</span></td>
       <td><span style="font-family:monospace;font-size:12px">${c.orden_compra || '<span style="color:var(--muted)">—</span>'}</span></td>
       <td><span class="badge ${c.modo === 'POST_TRABAJO' ? 'badge-blue' : 'badge-gray'}">${c.modo === 'POST_TRABAJO' ? 'Post OT' : 'Directa'}</span></td>
@@ -3082,11 +3086,12 @@ function filtrarEmpleados() {
 function renderTablaEmpleados(rows) {
   const pag = paginar('empleados', rows);
   let h = `<table><thead><tr>
-    <th>Nombre</th><th>Ubicación</th><th>Departamento</th><th>Puesto</th><th>Contrato</th>
+    <th>Nombre</th><th>Empresa</th><th>Ubicación</th><th>Departamento</th><th>Puesto</th><th>Contrato</th>
     <th>Salario Mensual</th><th>Sal. Quincenal</th><th>Seguro</th><th>Estado</th><th>Acciones</th>
   </tr></thead><tbody>`;
-  if (!pag.slice.length) h += '<tr><td colspan="9" class="empty-state">Sin empleados</td></tr>';
+  if (!pag.slice.length) h += '<tr><td colspan="10" class="empty-state">Sin empleados</td></tr>';
   pag.slice.forEach(e => {
+    const empresaBadge = e.empresa_nombre ? `<span class="badge badge-green">${e.empresa_nombre}</span>` : '—';
     const ubicBadge = e.ubicacion === 'VESTA'
       ? `<span class="badge badge-blue">VESTA</span>`
       : `<span class="badge badge-gray">SOLDYMEG</span>`;
@@ -3094,6 +3099,7 @@ function renderTablaEmpleados(rows) {
     const seguro = e.seguro_privado != null ? parseFloat(e.seguro_privado) : 0;
     h += `<tr>
       <td><strong>${e.nombre}</strong>${e.identidad?`<br><small style="color:var(--muted)">${e.identidad}</small>`:''}</td>
+      <td>${empresaBadge}</td>
       <td>${ubicBadge}</td>
       <td>${e.departamento_nombre||e.puesto||'—'}</td>
       <td>${e.puesto||'—'}</td>
@@ -3146,6 +3152,7 @@ async function abrirModalEmpleado() {
    'empPuesto','empBanco','empCuenta','empIHSS','empRAP'].forEach(id => document.getElementById(id).value='');
   document.getElementById('empSalario').value        = '';
   document.getElementById('empUbicacion').value      = 'SOLDYMEG';
+  document.getElementById('empEmpresaId').value      = '1';
   document.getElementById('empSeguro').value         = SEGURO_POR_UBICACION['SOLDYMEG'];
   document.getElementById('empContrato').value       = 'tiempo_completo';
   document.getElementById('empFechaIngreso').value   = new Date().toISOString().slice(0,10);
@@ -3166,6 +3173,7 @@ async function editarEmpleado(id) {
   document.getElementById('empNombres').value   = e.nombres || '';
   document.getElementById('empApellidos').value = e.apellidos || '';
   document.getElementById('empUbicacion').value      = e.ubicacion  || 'SOLDYMEG';
+  document.getElementById('empEmpresaId').value      = e.empresa_id || '1';
   document.getElementById('empIdentidad').value      = e.identidad  || '';
   document.getElementById('empTelefono').value       = e.telefono   || '';
   document.getElementById('empCorreo').value         = e.correo     || '';
@@ -3199,6 +3207,7 @@ async function guardarEmpleado() {
     nombres,
     apellidos,
     ubicacion:       document.getElementById('empUbicacion').value,
+    empresa_id:      document.getElementById('empEmpresaId')?.value || null,
     departamento_id: document.getElementById('empDepartamento').value || null,
     identidad:       document.getElementById('empIdentidad').value.trim(),
     telefono:        document.getElementById('empTelefono').value.trim(),
@@ -3252,7 +3261,7 @@ async function cargarPlanillas() {
   const empId = document.getElementById('planFiltroEmpresa')?.value || '';
   const r = await api('controllers/PlanillaController.php?action=listar' + (empId ? '&empresa_id='+empId : ''));
   if (!r.ok) { document.getElementById('tablaPlanillas').innerHTML = '<p style="color:var(--danger)">Error.</p>'; return; }
-  planillasData = r.data.data;
+  planillasData = (r.data.data || []).filter(p => p.quincena !== 'catorceavo' && p.quincena !== 'aguinaldo');
   if (planillasData.length) {
     const last = planillasData[0];
     document.getElementById('kpiPlanSalarios').textContent  = fmtMoneda(last.total_salarios);
@@ -3276,7 +3285,7 @@ function renderTablaPlanillas(rows) {
     const periodo = (meses[+p.periodo_mes]||'') + ' ' + p.periodo_anio;
     h += `<tr>
       <td><strong>${periodo}</strong></td>
-      <td>${p.empresa_nombre ? `<span class="badge badge-green">${p.empresa_nombre}</span>` : '—'}</td>
+      <td>${p.empresa_nombre?`<span class="badge badge-green">${p.empresa_nombre}</span>`:'—'}</td>
       <td><span class="badge badge-blue">${p.quincena||'1ra'} Quincena</span></td>
       <td>${p.fecha_pago}</td>
       <td>${fmtMoneda(p.total_salarios)}</td>
@@ -3335,10 +3344,7 @@ async function cargarExtrasEmpleados() {
     dias_faltados:  0,
     abono_prestamo: 0,
     abono_vale:     0,
-    viatico_s1:     0,
-    viatico_s2:     0,
-    viatico_s3:     0,
-    viatico_s4:     0,
+    viatico_s1:0, viatico_s2:0, viatico_s3:0, viatico_s4:0,
     aplicar_seguro: true,
   }));
   renderExtrasTable();
@@ -3352,7 +3358,7 @@ function calcNetoExtra(e) {
   const es2da      = planQuincenaSeleccionada === '2da';
   const aplicarSeg = es2da && (e.aplicar_seguro === true || e.aplicar_seguro === 1);
   const seguro     = aplicarSeg ? (parseFloat(e.seguro_privado) || 0) : 0;
-  const viaticos = (e.viatico_s1||0) + (e.viatico_s2||0) + (e.viatico_s3||0) + (e.viatico_s4||0);
+  const viaticos = (e.viatico_s1||0)+(e.viatico_s2||0)+(e.viatico_s3||0)+(e.viatico_s4||0);
   const ded    = mFalt + seguro + (e.abono_prestamo || 0) + (e.abono_vale || 0);
   return { quince, mHE, mFalt, seguro, ded, viaticos, neto: quince + mHE + viaticos - ded };
 }
@@ -3532,9 +3538,8 @@ async function editarPlanilla(id) {
   document.getElementById('planAnio').value      = p.periodo_anio;
   document.getElementById('planFechaPago').value = p.fecha_pago;
   document.getElementById('planObs').value       = p.observaciones || '';
-  // Setear empresa de la planilla en el filtro
-  const filtroEmp = document.getElementById('planFiltroEmpresa');
-  if (filtroEmp) filtroEmp.value = p.empresa_id || '';
+  const filtroEmpEdit = document.getElementById('planFiltroEmpresa');
+  if (filtroEmpEdit) filtroEmpEdit.value = p.empresa_id || '';
 
   // Reconstruir extras desde detalle guardado — PRESERVANDO todos los valores
   planEmpleadosExtras = (p.detalle || []).map(d => ({
@@ -3627,12 +3632,244 @@ async function eliminarPlanilla(id) {
 }
 
 function switchTabPlanilla(tab) {
-  document.getElementById('tabEmpleados').classList.toggle('active', tab==='empleados');
-  document.getElementById('tabPlanillas').classList.toggle('active', tab==='planillas');
-  document.getElementById('panelEmpleados').style.display = tab==='empleados' ? '' : 'none';
-  document.getElementById('panelPlanillas').style.display = tab==='planillas' ? '' : 'none';
-  if (tab==='planillas' && !planillasData.length) cargarPlanillas();
+  document.getElementById('tabEmpleados').classList.toggle('active',  tab==='empleados');
+  document.getElementById('tabPlanillas').classList.toggle('active',  tab==='planillas');
+  document.getElementById('tabEspeciales').classList.toggle('active', tab==='especiales');
+  document.getElementById('panelEmpleados').style.display  = tab==='empleados'  ? '' : 'none';
+  document.getElementById('panelPlanillas').style.display  = tab==='planillas'  ? '' : 'none';
+  document.getElementById('panelEspeciales').style.display = tab==='especiales' ? '' : 'none';
+  if (tab==='planillas')  cargarPlanillas();
   if (tab==='empleados' && !empleadosData.length) cargarEmpleados();
+  if (tab==='especiales') cargarEspeciales();
+}
+
+
+// ── PLANILLAS ESPECIALES (14vo / Aguinaldo) ───────────────
+let especialesData        = [];
+let espTipoSeleccionado   = 'catorceavo';
+let espEmpleados          = [];
+let _espEditandoId        = null;
+
+function selTipoEspecial(tipo) {
+  espTipoSeleccionado = tipo;
+  document.querySelectorAll('.especial-tipo-btn').forEach(el => {
+    el.style.borderColor = el.dataset.tipo===tipo ? 'var(--accent)' : 'var(--border)';
+    el.style.background  = el.dataset.tipo===tipo ? 'rgba(232,160,32,.12)' : '';
+  });
+  actualizarInfoPeriodo();
+  if (espEmpleados.length) renderTablaEspEmpleados();
+  document.getElementById('espPreview').style.display = 'none';
+}
+
+function actualizarInfoPeriodo() {
+  const anio = parseInt(document.getElementById('espAnio')?.value || new Date().getFullYear());
+  const label = espTipoSeleccionado === 'catorceavo'
+    ? `1 Jul ${anio-1} → 30 Jun ${anio}` : `1 Nov ${anio-1} → 31 Oct ${anio}`;
+  const el = document.getElementById('espPeriodoLabel');
+  if (el) el.textContent = label;
+}
+
+function calcMontoEsp(emp) {
+  const anio = parseInt(document.getElementById('espAnio')?.value || new Date().getFullYear());
+  const sal  = parseFloat(emp.salario_mensual) || 0;
+  const periodoIni = espTipoSeleccionado==='catorceavo' ? new Date(`${anio-1}-07-01`) : new Date(`${anio-1}-11-01`);
+  const periodoFin = espTipoSeleccionado==='catorceavo' ? new Date(`${anio}-06-30`)   : new Date(`${anio}-10-31`);
+  const totalDias  = Math.round((periodoFin-periodoIni)/86400000)+1;
+  const ingreso    = emp.fecha_ingreso ? new Date(emp.fecha_ingreso) : periodoIni;
+  const iniEf      = ingreso > periodoIni ? ingreso : periodoIni;
+  const diasTrab   = Math.max(0, Math.round((periodoFin-iniEf)/86400000)+1);
+  const meses      = Math.round(diasTrab/(totalDias/12)*100)/100;
+  const monto      = emp.excluido ? 0 : Math.round(sal*(diasTrab/totalDias)*100)/100;
+  return { monto, meses, diasTrab, totalDias };
+}
+
+function abrirModalGenerarEspecial() {
+  espTipoSeleccionado = 'catorceavo'; _espEditandoId = null; espEmpleados = [];
+  document.querySelectorAll('.especial-tipo-btn').forEach(el => {
+    el.style.borderColor = el.dataset.tipo==='catorceavo' ? 'var(--accent)' : 'var(--border)';
+    el.style.background  = el.dataset.tipo==='catorceavo' ? 'rgba(232,160,32,.12)' : '';
+  });
+  const now = new Date();
+  if (document.getElementById('espAnio'))      document.getElementById('espAnio').value      = now.getFullYear();
+  if (document.getElementById('espFechaPago')) document.getElementById('espFechaPago').value = now.toISOString().slice(0,10);
+  if (document.getElementById('espObs'))       document.getElementById('espObs').value       = '';
+  if (document.getElementById('errEspecial'))  document.getElementById('errEspecial').style.display = 'none';
+  if (document.getElementById('espPreview'))   document.getElementById('espPreview').style.display  = 'none';
+  if (document.getElementById('espExtrasWrap')) document.getElementById('espExtrasWrap').innerHTML =
+    '<p style="color:var(--muted);font-size:13px">Haz clic en "Cargar empleados".</p>';
+  if (document.getElementById('tituloEspecial')) document.getElementById('tituloEspecial').textContent = '📋 Generar Planilla Especial';
+  actualizarInfoPeriodo();
+  abrirModal('modalGenerarEspecial');
+}
+
+async function cargarEmpEspeciales() {
+  const r = await api('controllers/EmpleadoController.php?action=listar&estado=activo');
+  if (!r.ok) { toast('Error cargando empleados.','error'); return; }
+  espEmpleados = (r.data.data||[]).map(e => ({
+    empleado_id:    e.id_empleado,
+    nombre:         e.nombre,
+    empresa_nombre: e.empresa_nombre || '',
+    ubicacion:      e.ubicacion || 'SOLDYMEG',
+    salario_mensual:parseFloat(e.salario_mensual||0),
+    fecha_ingreso:  e.fecha_ingreso || null,
+    excluido:       false,
+  }));
+  renderTablaEspEmpleados();
+}
+
+function renderTablaEspEmpleados() {
+  if (!espEmpleados.length) { document.getElementById('espExtrasWrap').innerHTML='<p style="color:var(--muted)">Sin empleados activos.</p>'; return; }
+  const label = espTipoSeleccionado==='catorceavo' ? 'Catorceavo' : 'Aguinaldo';
+  let h = `<table style="min-width:680px"><thead><tr>
+    <th style="width:32px;text-align:center">✗</th>
+    <th style="text-align:left">Empleado</th>
+    <th>Empresa</th><th>Ubic.</th>
+    <th>Salario Mensual</th><th>Fecha Ingreso</th>
+    <th>Meses en período</th><th>${label} estimado</th>
+  </tr></thead><tbody>`;
+  espEmpleados.forEach((e,i) => {
+    const {monto,meses} = calcMontoEsp(e);
+    h += `<tr style="${e.excluido?'opacity:.45':''}">
+      <td style="text-align:center"><input type="checkbox" ${e.excluido?'checked':''}
+        style="width:16px;height:16px;accent-color:var(--danger);cursor:pointer"
+        onchange="espToggleExcluir(${i},this.checked)"></td>
+      <td style="text-align:left"><strong>${e.nombre}</strong></td>
+      <td style="text-align:center">${e.empresa_nombre?`<span class="badge badge-green">${e.empresa_nombre}</span>`:'—'}</td>
+      <td style="text-align:center"><span class="badge ${e.ubicacion==='VESTA'?'badge-blue':'badge-gray'}">${e.ubicacion}</span></td>
+      <td>${fmtMoneda(e.salario_mensual)}</td>
+      <td style="font-size:12px;color:var(--muted)">${e.fecha_ingreso||'—'}</td>
+      <td id="espMeses_${i}" style="text-align:center;color:var(--muted);font-size:13px">${e.excluido?'—':meses}</td>
+      <td id="espMonto_${i}" style="font-weight:600;color:${e.excluido?'var(--danger)':'var(--accent)'}">
+        ${e.excluido?'EXCLUIDO':fmtMoneda(monto)}</td>
+    </tr>`;
+  });
+  h += '</tbody></table>';
+  document.getElementById('espExtrasWrap').innerHTML = h;
+}
+
+function espToggleExcluir(idx, excluido) {
+  espEmpleados[idx].excluido = excluido;
+  const {monto,meses} = calcMontoEsp(espEmpleados[idx]);
+  const tr = document.getElementById(`espMonto_${idx}`)?.closest('tr');
+  if (tr) tr.style.opacity = excluido ? '.45' : '1';
+  const mEl=document.getElementById(`espMonto_${idx}`), msEl=document.getElementById(`espMeses_${idx}`);
+  if (mEl)  { mEl.textContent=excluido?'EXCLUIDO':fmtMoneda(monto); mEl.style.color=excluido?'var(--danger)':'var(--accent)'; }
+  if (msEl)   msEl.textContent = excluido?'—':meses;
+  document.getElementById('espPreview').style.display = 'none';
+}
+
+async function previsualizarEspecial() {
+  const anio=document.getElementById('espAnio').value;
+  const excluidos=espEmpleados.filter(e=>e.excluido).map(e=>e.empleado_id).join(',');
+  const r=await api(`controllers/PlanillaEspecialController.php?action=previsualizar&tipo=${espTipoSeleccionado}&anio=${anio}&excluidos=${excluidos}`);
+  if(!r.ok){toast(r.data.error||'Error.','error');return;}
+  const t=r.data.data.totales;
+  document.getElementById('pvEspEmpleados').textContent=t.total_empleados;
+  document.getElementById('pvEspExcluidos').textContent=t.excluidos;
+  document.getElementById('pvEspNeto').textContent=fmtMoneda(t.total_neto);
+  document.getElementById('espPreview').style.display='block';
+}
+
+async function confirmarGenerarEspecial() {
+  const errEl=document.getElementById('errEspecial'); errEl.style.display='none';
+  const anio=parseInt(document.getElementById('espAnio')?.value||0);
+  if(!anio){errEl.textContent='Selecciona el año.';errEl.style.display='block';return;}
+  const excluidos=espEmpleados.filter(e=>e.excluido).map(e=>e.empleado_id);
+  const body={tipo:espTipoSeleccionado,anio,fecha_pago:document.getElementById('espFechaPago').value,
+    observaciones:document.getElementById('espObs').value.trim(),excluidos,excluir_id:_espEditandoId||0};
+  const r=await api('controllers/PlanillaEspecialController.php?action=generar',{method:'POST',body:JSON.stringify(body)});
+  if(r.ok){
+    cerrarModal('modalGenerarEspecial');
+    toast(`Planilla de ${espTipoSeleccionado==='catorceavo'?'Catorceavo':'Aguinaldo'} ${anio} generada.`,'success');
+    cargarEspeciales();
+  } else { errEl.textContent=r.data.error||'Error al generar.'; errEl.style.display='block'; }
+}
+
+async function cargarEspeciales() {
+  const el=document.getElementById('tablaEspeciales');
+  if(!el) return;
+  el.innerHTML='<p class="loading">Cargando...</p>';
+  const r=await api('controllers/PlanillaEspecialController.php?action=listar');
+  if(!r.ok){el.innerHTML='<p style="color:var(--danger)">Error.</p>';return;}
+  especialesData=(r.data.data||[]).filter(p=>p.quincena==='catorceavo'||p.quincena==='aguinaldo');
+  const cat14=especialesData.find(p=>p.quincena==='catorceavo');
+  const agui =especialesData.find(p=>p.quincena==='aguinaldo');
+  const k1=document.getElementById('kpiEspCatorceavo'), k2=document.getElementById('kpiEspAguinaldo');
+  if(k1) k1.textContent=cat14?fmtMoneda(cat14.total_neto):'—';
+  if(k2) k2.textContent=agui ?fmtMoneda(agui.total_neto) :'—';
+  renderTablaEspeciales(especialesData);
+}
+
+function renderTablaEspeciales(rows) {
+  const labels={catorceavo:'1️⃣4️⃣ Catorceavo',aguinaldo:'🎄 Aguinaldo'};
+  let h=`<table><thead><tr><th>Tipo</th><th>Año</th><th>Fecha Pago</th><th>Empleados</th><th>Total Neto</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>`;
+  if(!rows.length) h+='<tr><td colspan="7" class="empty-state">Sin planillas especiales generadas</td></tr>';
+  rows.forEach(p=>{
+    h+=`<tr>
+      <td><strong>${labels[p.quincena]||p.quincena}</strong></td>
+      <td>${p.periodo_anio}</td><td>${p.fecha_pago}</td>
+      <td style="text-align:center">${p.total_empleados||'—'}</td>
+      <td><strong style="color:var(--accent)">${fmtMoneda(p.total_neto)}</strong></td>
+      <td>${badgeEstado(p.estado)}</td>
+      <td><div class="td-actions">
+        <button class="btn btn-sm btn-secondary" onclick="verDetalleEspecial(${p.id_planilla})">Ver</button>
+        ${p.estado==='borrador'?`<button class="btn btn-sm btn-primary" onclick="cerrarEspecial(${p.id_planilla})">✓ Cerrar</button>`:''}
+        ${p.estado==='borrador'?`<button class="btn btn-sm btn-danger" onclick="eliminarEspecial(${p.id_planilla})">Eliminar</button>`:''}
+      </div></td>
+    </tr>`;
+  });
+  h+='</tbody></table>';
+  const el=document.getElementById('tablaEspeciales'); if(el) el.innerHTML=h;
+}
+
+async function cerrarEspecial(id) {
+  if(!await confirmDialog('¿Cerrar esta planilla?')) return;
+  const r=await api('controllers/PlanillaEspecialController.php?action=cerrar',{method:'POST',body:JSON.stringify({id})});
+  if(r.ok){toast('Planilla cerrada.','success');cargarEspeciales();}
+  else toast(r.data.error||'Error.','error');
+}
+
+async function eliminarEspecial(id) {
+  if(!await confirmDialog('¿Eliminar esta planilla borrador?')) return;
+  const r=await api('controllers/PlanillaEspecialController.php?action=eliminar',{method:'POST',body:JSON.stringify({id})});
+  if(r.ok){toast('Planilla eliminada.','success');cargarEspeciales();}
+  else toast(r.data.error||'Error.','error');
+}
+
+async function verDetalleEspecial(id) {
+  abrirModal('modalDetalleEspecial');
+  document.getElementById('contenidoDetalleEspecial').innerHTML='<p class="loading">Cargando...</p>';
+  document.getElementById('footerDetalleEspecial').innerHTML=`<button class="btn btn-secondary" onclick="cerrarModal('modalDetalleEspecial')">Cerrar</button>`;
+  const r=await api('controllers/PlanillaEspecialController.php?action=obtener&id='+id);
+  if(!r.ok){document.getElementById('contenidoDetalleEspecial').innerHTML='<p style="color:var(--danger)">Error.</p>';return;}
+  const p=r.data.data;
+  const labels={catorceavo:'1️⃣4️⃣ Catorceavo',aguinaldo:'🎄 Aguinaldo'};
+  let h=`<h4>${labels[p.quincena]||p.quincena} ${p.periodo_anio} ${badgeEstado(p.estado)}</h4>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:13px">
+    <div><div style="color:var(--muted);font-size:11px">EMPLEADOS</div><strong>${p.detalle?p.detalle.filter(d=>d.observaciones!=='EXCLUIDO').length:'—'}</strong></div>
+    <div><div style="color:var(--muted);font-size:11px">EXCLUIDOS</div><strong style="color:var(--danger)">${p.detalle?p.detalle.filter(d=>d.observaciones==='EXCLUIDO').length:'—'}</strong></div>
+    <div><div style="color:var(--muted);font-size:11px">TOTAL NETO</div><strong style="color:var(--accent)">${fmtMoneda(p.total_neto)}</strong></div>
+    <div><div style="color:var(--muted);font-size:11px">FECHA PAGO</div><strong>${p.fecha_pago}</strong></div>
+  </div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Empleado</th><th>Empresa</th><th>Ubic.</th><th>Sal. Mensual</th><th>Fecha Ingreso</th><th>Estado</th><th>Monto</th></tr></thead><tbody>`;
+  (p.detalle||[]).forEach(d=>{
+    const excl=d.observaciones==='EXCLUIDO';
+    h+=`<tr style="${excl?'opacity:.5':''}">
+      <td><strong>${d.empleado}</strong><br><small style="color:var(--muted)">${d.puesto||''}</small></td>
+      <td>${d.empresa_nombre?`<span class="badge badge-green">${d.empresa_nombre}</span>`:'—'}</td>
+      <td>${d.ubicacion==='VESTA'?'<span class="badge badge-blue">VESTA</span>':'<span class="badge badge-gray">SOLDYMEG</span>'}</td>
+      <td>${fmtMoneda(d.salario_base)}</td>
+      <td style="font-size:12px;color:var(--muted)">${d.fecha_ingreso||'—'}</td>
+      <td>${excl?'<span class="badge badge-red">EXCLUIDO</span>':'<span class="badge badge-green">Incluido</span>'}</td>
+      <td><strong style="color:${excl?'var(--danger)':'var(--accent)'}">${excl?'—':fmtMoneda(d.salario_neto)}</strong></td>
+    </tr>`;
+  });
+  h+='</tbody></table></div>';
+  document.getElementById('contenidoDetalleEspecial').innerHTML=h;
+  document.getElementById('footerDetalleEspecial').innerHTML=`
+    <button class="btn btn-secondary" onclick="cerrarModal('modalDetalleEspecial')">Cerrar</button>
+    ${p.estado==='borrador'?`<button class="btn btn-primary" onclick="cerrarModal('modalDetalleEspecial');cerrarEspecial(${id})">✓ Cerrar Planilla</button>`:''}`;
 }
 
 // ── REPORTES ──────────────────────────────────────────────
@@ -3709,6 +3946,8 @@ function exportarReporteExcel() {
 
 // ── Loader + paginación ───────────────────────────────────
 async function cargarModuloPlanillas() {
+  planillasData  = [];
+  especialesData = [];
   await cargarEmpleados();
 }
 
