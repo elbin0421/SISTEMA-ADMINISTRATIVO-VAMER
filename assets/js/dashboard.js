@@ -3802,17 +3802,22 @@ async function cargarEspeciales() {
 
 function renderTablaEspeciales(rows) {
   const labels={catorceavo:'1️⃣4️⃣ Catorceavo',aguinaldo:'🎄 Aguinaldo'};
-  let h=`<table><thead><tr><th>Tipo</th><th>Año</th><th>Fecha Pago</th><th>Empleados</th><th>Total Neto</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>`;
-  if(!rows.length) h+='<tr><td colspan="7" class="empty-state">Sin planillas especiales generadas</td></tr>';
+  let h=`<table><thead><tr><th>Tipo</th><th>Empresa</th><th>Año</th><th>Fecha Pago</th><th>Empleados</th><th>Total Neto</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>`;
+  if(!rows.length) h+='<tr><td colspan="8" class="empty-state">Sin planillas especiales generadas</td></tr>';
   rows.forEach(p=>{
+    const empBadge = p.empresa_nombre ? `<span class="badge badge-green">${p.empresa_nombre}</span>` : '—';
     h+=`<tr>
       <td><strong>${labels[p.quincena]||p.quincena}</strong></td>
+      <td>${empBadge}</td>
       <td>${p.periodo_anio}</td><td>${p.fecha_pago}</td>
       <td style="text-align:center">${p.total_empleados||'—'}</td>
       <td><strong style="color:var(--accent)">${fmtMoneda(p.total_neto)}</strong></td>
       <td>${badgeEstado(p.estado)}</td>
       <td><div class="td-actions">
         <button class="btn btn-sm btn-secondary" onclick="verDetalleEspecial(${p.id_planilla})">Ver</button>
+        <a href="controllers/ReportesController.php?action=planilla_pdf&id=${p.id_planilla}" target="_blank" class="btn btn-sm btn-secondary">📄 PDF</a>
+        <a href="controllers/ReportesController.php?action=planilla_excel&id=${p.id_planilla}" class="btn btn-sm btn-secondary">⬇️ Excel</a>
+        ${p.estado==='borrador'?`<button class="btn btn-sm btn-secondary" onclick="editarEspecial(${p.id_planilla})">✏️ Editar</button>`:''}
         ${p.estado==='borrador'?`<button class="btn btn-sm btn-primary" onclick="cerrarEspecial(${p.id_planilla})">✓ Cerrar</button>`:''}
         ${p.estado==='borrador'?`<button class="btn btn-sm btn-danger" onclick="eliminarEspecial(${p.id_planilla})">Eliminar</button>`:''}
       </div></td>
@@ -3834,6 +3839,37 @@ async function eliminarEspecial(id) {
   const r=await api('controllers/PlanillaEspecialController.php?action=eliminar',{method:'POST',body:JSON.stringify({id})});
   if(r.ok){toast('Planilla eliminada.','success');cargarEspeciales();}
   else toast(r.data.error||'Error.','error');
+}
+
+async function editarEspecial(id) {
+  const r = await api('controllers/PlanillaEspecialController.php?action=obtener&id=' + id);
+  if (!r.ok) { toast('Error cargando planilla.','error'); return; }
+  const p = r.data.data;
+  espTipoSeleccionado = p.quincena || 'catorceavo';
+  _espEditandoId      = id;
+  document.querySelectorAll('.especial-tipo-btn').forEach(el => {
+    el.style.borderColor = el.dataset.tipo===espTipoSeleccionado ? 'var(--accent)' : 'var(--border)';
+    el.style.background  = el.dataset.tipo===espTipoSeleccionado ? 'rgba(232,160,32,.12)' : '';
+  });
+  if (document.getElementById('espAnio'))      document.getElementById('espAnio').value      = p.periodo_anio;
+  if (document.getElementById('espFechaPago')) document.getElementById('espFechaPago').value = p.fecha_pago;
+  if (document.getElementById('espObs'))       document.getElementById('espObs').value       = p.observaciones || '';
+  if (document.getElementById('errEspecial'))  document.getElementById('errEspecial').style.display = 'none';
+  if (document.getElementById('espPreview'))   document.getElementById('espPreview').style.display  = 'none';
+  if (document.getElementById('tituloEspecial')) document.getElementById('tituloEspecial').textContent = '✏️ Editar Planilla Especial';
+  // Reconstruir lista de empleados desde detalle guardado
+  espEmpleados = (p.detalle || []).map(d => ({
+    empleado_id:    d.empleado_id,
+    nombre:         d.empleado,
+    empresa_nombre: d.empresa_nombre || '',
+    ubicacion:      d.ubicacion || 'SOLDYMEG',
+    salario_mensual:parseFloat(d.salario_base || 0),
+    fecha_ingreso:  d.fecha_ingreso || null,
+    excluido:       d.observaciones === 'EXCLUIDO',
+  }));
+  actualizarInfoPeriodo();
+  renderTablaEspEmpleados();
+  abrirModal('modalGenerarEspecial');
 }
 
 async function verDetalleEspecial(id) {
