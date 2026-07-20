@@ -22,8 +22,9 @@ match(true) {
 };
 
 function listar(): void {
-    $tipo = $_GET['tipo'] ?? '';
-    responder(200,['ok'=>true,'data'=>PlanillaEspecialModel::listar($tipo)]);
+    $tipo       = $_GET['tipo']       ?? '';
+    $empresa_id = (int)($_GET['empresa_id'] ?? 0);
+    responder(200,['ok'=>true,'data'=>PlanillaEspecialModel::listar($tipo, $empresa_id)]);
 }
 function obtener(): void {
     $id = (int)($_GET['id']??0);
@@ -35,18 +36,28 @@ function previsualizar(): void {
     $tipo      = $_GET['tipo']  ?? 'catorceavo';
     $anio      = (int)($_GET['anio'] ?? date('Y'));
     $excluidos = array_filter(array_map('intval', explode(',', $_GET['excluidos'] ?? '')));
-    try { responder(200,['ok'=>true,'data'=>PlanillaEspecialModel::previsualizar($tipo,$anio,$excluidos)]); }
+    $empresa_id= (int)($_GET['empresa_id'] ?? 0);
+    try { responder(200,['ok'=>true,'data'=>PlanillaEspecialModel::previsualizar($tipo,$anio,$excluidos,$empresa_id)]); }
     catch(Exception $e){ responder(400,['error'=>$e->getMessage()]); }
 }
 function generar(array $sesion): void {
     requirePermiso($sesion['rol_id'],'planillas','puede_crear');
-    $d         = json_decode(file_get_contents('php://input'),true) ?? [];
-    $tipo      = trim($d['tipo'] ?? 'catorceavo');
-    $anio      = (int)($d['anio'] ?? 0);
-    $excluidos = array_values(array_filter(array_map('intval',$d['excluidos']??[])));
+    $d          = json_decode(file_get_contents('php://input'),true) ?? [];
+    $tipo       = trim($d['tipo'] ?? 'catorceavo');
+    $anio       = (int)($d['anio'] ?? 0);
+    $empresa_id = (int)($d['empresa_id'] ?? 0);
+    $excluidos  = array_values(array_filter(array_map('intval',$d['excluidos']??[])));
     if(!$anio||!in_array($tipo,['catorceavo','aguinaldo'])){ responder(400,['error'=>'tipo y anio requeridos.']); return; }
     try {
-        $id = PlanillaEspecialModel::generar($tipo,$anio,$d['fecha_pago']??date('Y-m-d'),$d['observaciones']??'',$excluidos,$sesion['usuario_id'],(int)($d['excluir_id']??0));
+        $id = PlanillaEspecialModel::generar(
+            $tipo, $anio,
+            $d['fecha_pago']    ?? date('Y-m-d'),
+            $d['observaciones'] ?? '',
+            $excluidos,
+            $sesion['usuario_id'],
+            (int)($d['excluir_id'] ?? 0),
+            $empresa_id
+        );
         responder(201,['ok'=>true,'id'=>$id,'data'=>PlanillaEspecialModel::obtener($id)]);
     } catch(Exception $e){ responder(400,['error'=>$e->getMessage()]); }
 }

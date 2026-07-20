@@ -33,7 +33,16 @@
     <div class="card">
       <div class="card-header">
         <h4>📋 Planillas Generadas</h4>
-        <button class="btn btn-primary" onclick="abrirModalGenerarPlanilla()">+ Generar Planilla</button>
+        <div class="btn-group">
+          <label style="font-size:12px;color:var(--muted);white-space:nowrap;align-self:center">Empresa:</label>
+          <select id="planFiltroEmpresaLista" onchange="cargarPlanillas()"
+            style="padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px">
+            <option value="">Todas</option>
+            <option value="1">SOLDYMEG</option>
+            <option value="2">VAMER</option>
+          </select>
+          <button class="btn btn-primary" onclick="abrirModalGenerarPlanilla()">+ Generar Planilla</button>
+        </div>
       </div>
       <div class="kpi-grid" style="margin-bottom:16px">
         <div class="kpi-card"><div class="kpi-label">Total salarios (último)</div><div class="kpi-val" id="kpiPlanSalarios">—</div></div>
@@ -50,7 +59,16 @@
     <div class="card">
       <div class="card-header">
         <h4>1️⃣4️⃣ / 🎄 Planillas Especiales</h4>
-        <button class="btn btn-primary" onclick="abrirModalGenerarEspecial()">+ Generar 14vo / Aguinaldo</button>
+        <div class="btn-group">
+          <label style="font-size:12px;color:var(--muted);white-space:nowrap;align-self:center">Empresa:</label>
+          <select id="planFiltroEmpresaEsp" onchange="cargarEspeciales()"
+            style="padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px">
+            <option value="">Todas</option>
+            <option value="1">SOLDYMEG</option>
+            <option value="2">VAMER</option>
+          </select>
+          <button class="btn btn-primary" onclick="abrirModalGenerarEspecial()">+ Generar 14vo / Aguinaldo</button>
+        </div>
       </div>
       <div class="kpi-grid" style="margin-bottom:16px">
         <div class="kpi-card"><div class="kpi-label">Último 14vo — Neto</div><div class="kpi-val" id="kpiEspCatorceavo">—</div></div>

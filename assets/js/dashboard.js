@@ -3258,7 +3258,7 @@ function selQuincena(q) {
 
 async function cargarPlanillas() {
   document.getElementById('tablaPlanillas').innerHTML = '<p class="loading">Cargando...</p>';
-  const empId = document.getElementById('planFiltroEmpresa')?.value || '';
+  const empId = document.getElementById('planFiltroEmpresaLista')?.value || '';
   const r = await api('controllers/PlanillaController.php?action=listar' + (empId ? '&empresa_id='+empId : ''));
   if (!r.ok) { document.getElementById('tablaPlanillas').innerHTML = '<p style="color:var(--danger)">Error.</p>'; return; }
   planillasData = (r.data.data || []).filter(p => p.quincena !== 'catorceavo' && p.quincena !== 'aguinaldo');
@@ -3698,12 +3698,16 @@ function abrirModalGenerarEspecial() {
   if (document.getElementById('espExtrasWrap')) document.getElementById('espExtrasWrap').innerHTML =
     '<p style="color:var(--muted);font-size:13px">Haz clic en "Cargar empleados".</p>';
   if (document.getElementById('tituloEspecial')) document.getElementById('tituloEspecial').textContent = '📋 Generar Planilla Especial';
+  const espEmpSel = document.getElementById('espFiltroEmpresa');
+  if (espEmpSel) espEmpSel.value = '0';
   actualizarInfoPeriodo();
   abrirModal('modalGenerarEspecial');
 }
 
 async function cargarEmpEspeciales() {
-  const r = await api('controllers/EmpleadoController.php?action=listar&estado=activo');
+  const espEmpId = document.getElementById('espFiltroEmpresa')?.value || '';
+  const url = 'controllers/EmpleadoController.php?action=listar&estado=activo' + (espEmpId && espEmpId!=='0' ? '&empresa_id='+espEmpId : '');
+  const r = await api(url);
   if (!r.ok) { toast('Error cargando empleados.','error'); return; }
   espEmpleados = (r.data.data||[]).map(e => ({
     empleado_id:    e.id_empleado,
@@ -3775,8 +3779,9 @@ async function confirmarGenerarEspecial() {
   const anio=parseInt(document.getElementById('espAnio')?.value||0);
   if(!anio){errEl.textContent='Selecciona el año.';errEl.style.display='block';return;}
   const excluidos=espEmpleados.filter(e=>e.excluido).map(e=>e.empleado_id);
+  const espEmpId = document.getElementById('espFiltroEmpresa')?.value || 0;
   const body={tipo:espTipoSeleccionado,anio,fecha_pago:document.getElementById('espFechaPago').value,
-    observaciones:document.getElementById('espObs').value.trim(),excluidos,excluir_id:_espEditandoId||0};
+    observaciones:document.getElementById('espObs').value.trim(),excluidos,excluir_id:_espEditandoId||0,empresa_id:+espEmpId||0};
   const r=await api('controllers/PlanillaEspecialController.php?action=generar',{method:'POST',body:JSON.stringify(body)});
   if(r.ok){
     cerrarModal('modalGenerarEspecial');
@@ -3789,7 +3794,8 @@ async function cargarEspeciales() {
   const el=document.getElementById('tablaEspeciales');
   if(!el) return;
   el.innerHTML='<p class="loading">Cargando...</p>';
-  const r=await api('controllers/PlanillaEspecialController.php?action=listar');
+  const empEspId = document.getElementById('planFiltroEmpresaEsp')?.value || '';
+  const r=await api('controllers/PlanillaEspecialController.php?action=listar' + (empEspId ? '&empresa_id='+empEspId : ''));
   if(!r.ok){el.innerHTML='<p style="color:var(--danger)">Error.</p>';return;}
   especialesData=(r.data.data||[]).filter(p=>p.quincena==='catorceavo'||p.quincena==='aguinaldo');
   const cat14=especialesData.find(p=>p.quincena==='catorceavo');
@@ -3847,6 +3853,8 @@ async function editarEspecial(id) {
   const p = r.data.data;
   espTipoSeleccionado = p.quincena || 'catorceavo';
   _espEditandoId      = id;
+  const espEmpSelEdit = document.getElementById('espFiltroEmpresa');
+  if (espEmpSelEdit) espEmpSelEdit.value = p.empresa_id || '0';
   document.querySelectorAll('.especial-tipo-btn').forEach(el => {
     el.style.borderColor = el.dataset.tipo===espTipoSeleccionado ? 'var(--accent)' : 'var(--border)';
     el.style.background  = el.dataset.tipo===espTipoSeleccionado ? 'rgba(232,160,32,.12)' : '';

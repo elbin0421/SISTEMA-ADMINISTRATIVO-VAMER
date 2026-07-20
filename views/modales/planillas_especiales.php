@@ -1,10 +1,11 @@
-<!-- ══ MODAL: GENERAR PLANILLA ESPECIAL (Catorceavo / Aguinaldo) ══ -->
+<!-- MODAL: GENERAR PLANILLA ESPECIAL -->
 <div class="modal-bg" id="modalGenerarEspecial" style="align-items:flex-start;padding:10px">
   <div class="modal modal-lg" style="max-width:98vw;width:100%;max-height:calc(100vh - 20px);overflow-y:auto;margin:0 auto">
     <h4 id="tituloEspecial">📋 Generar Planilla Especial</h4>
     <div class="alert alert-error" id="errEspecial" style="display:none"></div>
 
-    <div style="display:grid;grid-template-columns:auto auto 1fr 1fr;gap:12px;align-items:end;margin-bottom:14px">
+    <!-- Tipo + Empresa + Año + Fecha + Obs -->
+    <div style="display:grid;grid-template-columns:auto auto auto 1fr 1fr;gap:12px;align-items:end;margin-bottom:14px">
       <div>
         <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:5px">Tipo *</label>
         <div style="display:flex;gap:8px">
@@ -19,6 +20,14 @@
             <div style="font-size:10px;color:var(--muted)">Nov 1 – Oct 31</div>
           </div>
         </div>
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>Empresa *</label>
+        <select id="espFiltroEmpresa" style="min-width:110px">
+          <option value="0">Todas</option>
+          <option value="1">SOLDYMEG</option>
+          <option value="2">VAMER</option>
+        </select>
       </div>
       <div class="form-group" style="margin:0">
         <label>Año de pago *</label>
@@ -46,7 +55,7 @@
       <button class="btn btn-secondary btn-sm" onclick="cargarEmpEspeciales()">🔄 Cargar empleados</button>
     </div>
     <div id="espExtrasWrap" style="overflow-x:auto;border:1px solid var(--border);border-radius:8px;padding:8px;background:var(--bg);min-height:60px">
-      <p style="color:var(--muted);font-size:13px;padding:8px">Haz clic en "Cargar empleados".</p>
+      <p style="color:var(--muted);font-size:13px;padding:8px">Selecciona la empresa y haz clic en "Cargar empleados".</p>
     </div>
 
     <div id="espPreview" style="display:none;background:var(--sidebar);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px;margin-top:10px">
@@ -66,7 +75,7 @@
   </div>
 </div>
 
-<!-- ══ MODAL: DETALLE PLANILLA ESPECIAL ══ -->
+<!-- MODAL: DETALLE PLANILLA ESPECIAL -->
 <div class="modal-bg" id="modalDetalleEspecial">
   <div class="modal modal-lg" style="max-width:960px">
     <div id="contenidoDetalleEspecial"><p class="loading">Cargando...</p></div>
