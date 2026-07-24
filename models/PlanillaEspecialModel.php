@@ -49,65 +49,86 @@ class PlanillaEspecialModel {
 
     public static function generar(string $tipo, int $anio_pago, string $fecha_pago, string $observaciones, array $excluidos, int $usuario_id, int $excluirId = 0, int $empresa_id = 0): int {
         $pdo = getDB();
-        // Check duplicate considering empresa_id
-        $sql    = "SELECT id_planilla FROM planillas WHERE quincena=? AND periodo_anio=? AND periodo_mes=? AND (empresa_id=? OR (empresa_id IS NULL AND ?=0))";
-        $params = [$tipo, $anio_pago, $tipo==='catorceavo'?6:12, $empresa_id?:null, $empresa_id];
-        if ($excluirId>0) { $sql.=" AND id_planilla!=?"; $params[]=$excluirId; }
-        $chk=$pdo->prepare($sql); $chk->execute($params);
+
+        // Si es edición: eliminar la anterior ANTES de chequear duplicado e insertar
+        if ($excluirId > 0) {
+            $pdo->prepare("DELETE FROM detalle_planilla WHERE planilla_id=?")->execute([$excluirId]);
+            $pdo->prepare("DELETE FROM planillas WHERE id_planilla=?")->execute([$excluirId]);
+        }
+
+        // Verificar duplicado (ya sin el registro eliminado)
+        $sql    = "SELECT id_planilla FROM planillas WHERE quincena=? AND periodo_anio=? AND periodo_mes=?";
+        $params = [$tipo, $anio_pago, $tipo==='catorceavo' ? 6 : 12];
+        if ($empresa_id) { $sql .= " AND empresa_id=?"; $params[] = $empresa_id; }
+        $chk = $pdo->prepare($sql); $chk->execute($params);
         if ($chk->fetch()) {
-            $label = $tipo==='catorceavo'?'Catorceavo':'Aguinaldo';
+            $label = $tipo==='catorceavo' ? 'Catorceavo' : 'Aguinaldo';
             throw new Exception("Ya existe la planilla de {$label} {$anio_pago}.");
         }
+
         $empleados = EmpleadoModel::listar('activo', '', $empresa_id);
         if (!$empleados) throw new Exception('No hay empleados activos.');
-        $detalle=[]; foreach($empleados as $emp){
-            $fila=self::calcularEmpleado($emp,$tipo,$anio_pago);
-            if(in_array($fila['empleado_id'],$excluidos)){$fila['excluido']=true;$fila['monto']=0;}
-            $detalle[]=$fila;
+
+        $detalle = [];
+        foreach ($empleados as $emp) {
+            $fila = self::calcularEmpleado($emp, $tipo, $anio_pago);
+            if (in_array($fila['empleado_id'], $excluidos)) { $fila['excluido']=true; $fila['monto']=0; }
+            $detalle[] = $fila;
         }
-        $totales=self::sumarTotales($detalle);
-        $mes_pago=$tipo==='catorceavo'?6:12;
+        $totales  = self::sumarTotales($detalle);
+        $mes_pago = $tipo === 'catorceavo' ? 6 : 12;
+
         $pdo->beginTransaction();
         try {
             $pdo->prepare("INSERT INTO planillas (periodo_mes,periodo_anio,quincena,fecha_pago,total_salarios,total_ihss_emp,total_ihss_pat,total_rap,total_isr,total_seguro,total_deducciones,total_neto,observaciones,estado,usuario_id,empresa_id) VALUES (?,?,?,?,?,0,0,0,0,0,?,?,?,'borrador',?,?)")
                 ->execute([$mes_pago,$anio_pago,$tipo,$fecha_pago,$totales['total_salarios'],0,$totales['total_neto'],$observaciones,$usuario_id,$empresa_id?:null]);
-            $planilla_id=(int)$pdo->lastInsertId();
-            $ins=$pdo->prepare("INSERT INTO detalle_planilla (planilla_id,empleado_id,salario_base,horas_extra,monto_horas_extra,dias_faltados,monto_dias_faltados,ihss_empleado,ihss_patronal,rap_empleado,isr_mensual,seguro_privado,aplicar_seguro,abono_prestamo,abono_vale,otras_deducciones,total_deducciones,salario_neto,vacaciones_acum,decimo_acum,observaciones) VALUES (?,?,?,0,0,0,0,0,0,0,0,0,0,0,0,0,0,?,0,0,?)");
-            foreach($detalle as $d){ $ins->execute([$planilla_id,$d['empleado_id'],$d['salario_mensual'],$d['monto'],$d['excluido']?'EXCLUIDO':null]); }
+            $planilla_id = (int)$pdo->lastInsertId();
+            $ins = $pdo->prepare("INSERT INTO detalle_planilla (planilla_id,empleado_id,salario_base,horas_extra,monto_horas_extra,dias_faltados,monto_dias_faltados,ihss_empleado,ihss_patronal,rap_empleado,isr_mensual,seguro_privado,aplicar_seguro,abono_prestamo,abono_vale,otras_deducciones,total_deducciones,salario_neto,vacaciones_acum,decimo_acum,observaciones) VALUES (?,?,?,0,0,0,0,0,0,0,0,0,0,0,0,0,0,?,0,0,?)");
+            foreach ($detalle as $d) {
+                $ins->execute([$planilla_id, $d['empleado_id'], $d['salario_mensual'], $d['monto'], $d['excluido']?'EXCLUIDO':null]);
+            }
             $pdo->commit();
             return $planilla_id;
-        } catch(Exception $e){ $pdo->rollBack(); throw $e; }
+        } catch (Exception $e) { $pdo->rollBack(); throw $e; }
     }
 
     public static function listar(string $tipo='', int $empresa_id=0): array {
-        $pdo=$getDB=getDB();
-        $where="p.quincena IN ('catorceavo','aguinaldo')";
-        $params=[];
-        if($tipo){$where.=" AND p.quincena=?";$params[]=$tipo;}
-        if($empresa_id){$where.=" AND p.empresa_id=?";$params[]=$empresa_id;}
-        $stmt=$pdo->prepare("SELECT p.*, u.nombre AS usuario, emp.nombre AS empresa_nombre,(SELECT COUNT(*) FROM detalle_planilla dp WHERE dp.planilla_id=p.id_planilla) AS total_empleados FROM planillas p JOIN usuarios u ON u.id_usuario=p.usuario_id LEFT JOIN empresas emp ON emp.id_empresa=p.empresa_id WHERE $where ORDER BY p.periodo_anio DESC,p.quincena ASC");
+        $pdo    = getDB();
+        $where  = "p.quincena IN ('catorceavo','aguinaldo')";
+        $params = [];
+        if ($tipo)       { $where .= " AND p.quincena=?";    $params[] = $tipo; }
+        if ($empresa_id) { $where .= " AND p.empresa_id=?";  $params[] = $empresa_id; }
+        $stmt = $pdo->prepare("
+            SELECT p.*, u.nombre AS usuario, emp.nombre AS empresa_nombre,
+                   (SELECT COUNT(*) FROM detalle_planilla dp WHERE dp.planilla_id=p.id_planilla) AS total_empleados
+            FROM planillas p
+            JOIN usuarios u ON u.id_usuario = p.usuario_id
+            LEFT JOIN empresas emp ON emp.id_empresa = p.empresa_id
+            WHERE $where ORDER BY p.periodo_anio DESC, p.quincena ASC");
         $stmt->execute($params);
         return $stmt->fetchAll();
     }
 
     public static function obtener(int $id): ?array {
-        $pdo=$pdo=getDB();
-        $stmt=$pdo->prepare("SELECT p.*,u.nombre AS usuario,emp.nombre AS empresa_nombre FROM planillas p JOIN usuarios u ON u.id_usuario=p.usuario_id LEFT JOIN empresas emp ON emp.id_empresa=p.empresa_id WHERE p.id_planilla=?");
-        $stmt->execute([$id]); $planilla=$stmt->fetch();
-        if(!$planilla) return null;
-        $det=$pdo->prepare("SELECT dp.*,CONCAT(e.nombres,' ',e.apellidos) AS empleado,e.puesto,e.tipo_contrato,e.ubicacion,em.nombre AS empresa_nombre,e.banco,e.cuenta_banco,e.salario_mensual,e.fecha_ingreso FROM detalle_planilla dp JOIN empleados e ON e.id_empleado=dp.empleado_id LEFT JOIN empresas em ON em.id_empresa=e.empresa_id WHERE dp.planilla_id=? ORDER BY e.apellidos,e.nombres");
-        $det->execute([$id]); $planilla['detalle']=$det->fetchAll();
+        $pdo  = getDB();
+        $stmt = $pdo->prepare("SELECT p.*, u.nombre AS usuario, emp.nombre AS empresa_nombre FROM planillas p JOIN usuarios u ON u.id_usuario=p.usuario_id LEFT JOIN empresas emp ON emp.id_empresa=p.empresa_id WHERE p.id_planilla=?");
+        $stmt->execute([$id]);
+        $planilla = $stmt->fetch();
+        if (!$planilla) return null;
+        $det = $pdo->prepare("SELECT dp.*, CONCAT(e.nombres,' ',e.apellidos) AS empleado, e.puesto, e.tipo_contrato, e.ubicacion, em.nombre AS empresa_nombre, e.banco, e.cuenta_banco, e.salario_mensual, e.fecha_ingreso FROM detalle_planilla dp JOIN empleados e ON e.id_empleado=dp.empleado_id LEFT JOIN empresas em ON em.id_empresa=e.empresa_id WHERE dp.planilla_id=? ORDER BY e.apellidos, e.nombres");
+        $det->execute([$id]);
+        $planilla['detalle'] = $det->fetchAll();
         return $planilla;
     }
 
     private static function sumarTotales(array $detalle): array {
-        $t=['total_salarios'=>0,'total_neto'=>0,'total_empleados'=>0,'excluidos'=>0];
-        foreach($detalle as $d){
-            if(!$d['excluido']){$t['total_salarios']+=$d['salario_mensual'];$t['total_neto']+=$d['monto'];$t['total_empleados']++;}
+        $t = ['total_salarios'=>0,'total_neto'=>0,'total_empleados'=>0,'excluidos'=>0];
+        foreach ($detalle as $d) {
+            if (!$d['excluido']) { $t['total_salarios']+=$d['salario_mensual']; $t['total_neto']+=$d['monto']; $t['total_empleados']++; }
             else $t['excluidos']++;
         }
-        $t['total_salarios']=round($t['total_salarios'],2);
-        $t['total_neto']=round($t['total_neto'],2);
+        $t['total_salarios'] = round($t['total_salarios'],2);
+        $t['total_neto']     = round($t['total_neto'],2);
         return $t;
     }
 }
