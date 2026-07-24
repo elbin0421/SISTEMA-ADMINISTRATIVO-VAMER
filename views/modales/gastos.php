@@ -1,5 +1,5 @@
 <div class="modal-bg" id="modalGasto">
-  <div class="modal" style="max-width:680px">
+  <div class="modal" style="max-width:700px">
     <div class="modal-header">
       <h3 id="modalGastoTitulo">🧾 Nuevo Gasto</h3>
       <button class="modal-close" onclick="cerrarModal('modalGasto')">✕</button>
@@ -8,7 +8,6 @@
       <div id="errGasto" class="error-msg" style="display:none"></div>
       <input type="hidden" id="gastoId">
 
-      <!-- Fila 1: Fecha + Tipo doc -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
         <div><label class="form-label">Fecha *</label><input type="date" id="gastoFecha" class="form-control"></div>
         <div><label class="form-label">Tipo de documento *</label>
@@ -19,7 +18,6 @@
         </div>
       </div>
 
-      <!-- Fila 2: N° Doc + Categoría -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
         <div><label class="form-label">N° Factura / Documento</label>
           <input type="text" id="gastoNumDoc" class="form-control" placeholder="001-001-01-00000123" style="text-transform:uppercase">
@@ -35,7 +33,6 @@
         </div>
       </div>
 
-      <!-- Fila 3: RTN + Proveedor -->
       <div style="display:grid;grid-template-columns:1fr 2fr;gap:12px;margin-bottom:12px">
         <div>
           <label class="form-label">RTN Proveedor</label>
@@ -48,7 +45,7 @@
         </div>
       </div>
 
-      <!-- ── ÍTEMS DE LA FACTURA ── -->
+      <!-- ── ÍTEMS DEL DOCUMENTO ── -->
       <div style="margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
           <label class="form-label" style="margin:0">Ítems del documento *</label>
@@ -59,9 +56,9 @@
             <thead>
               <tr style="background:var(--sidebar)">
                 <th style="padding:7px 10px;text-align:left;font-weight:600;color:var(--muted);font-size:11px">DESCRIPCIÓN</th>
-                <th style="padding:7px 10px;text-align:right;font-weight:600;color:var(--muted);font-size:11px;width:80px">CANT.</th>
-                <th style="padding:7px 10px;text-align:right;font-weight:600;color:var(--muted);font-size:11px;width:120px">P. UNIT. (sin ISV)</th>
-                <th style="padding:7px 10px;text-align:right;font-weight:600;color:var(--muted);font-size:11px;width:120px">TOTAL ÍTEM</th>
+                <th style="padding:7px 10px;text-align:right;font-weight:600;color:var(--muted);font-size:11px;width:70px">CANT.</th>
+                <th style="padding:7px 10px;text-align:right;font-weight:600;color:var(--muted);font-size:11px;width:110px">P. UNIT.</th>
+                <th style="padding:7px 10px;text-align:right;font-weight:600;color:var(--muted);font-size:11px;width:110px">TOTAL</th>
                 <th style="width:36px"></th>
               </tr>
             </thead>
@@ -70,7 +67,6 @@
         </div>
       </div>
 
-      <!-- Tasa ISV + Totales -->
       <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
         <div style="width:300px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 16px;font-size:13px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:10px">
@@ -94,7 +90,6 @@
         </div>
       </div>
 
-      <!-- Mes/Año + Estado + Deducible -->
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
         <div><label class="form-label">Mes declaración *</label>
           <select id="gastoMes" class="form-control">
