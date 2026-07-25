@@ -16,7 +16,28 @@ class GastosModel {
             WHERE " . implode(' AND ', $where) . "
             ORDER BY g.fecha DESC, g.id_gasto DESC LIMIT 500");
         $stmt->execute($params);
-        return $stmt->fetchAll();
+        $rows = $stmt->fetchAll();
+        if (!$rows) return [];
+
+        // Traer TODOS los items en una sola consulta (evita N+1 y cuelgues del frontend)
+        $ids = array_column($rows, 'id_gasto');
+        $itemsPorGasto = [];
+        try {
+            $chkTabla = $pdo->query("SHOW TABLES LIKE 'gastos_dmc_items'")->fetchAll();
+            if ($chkTabla && $ids) {
+                $in  = implode(',', array_fill(0, count($ids), '?'));
+                $itQ = $pdo->prepare("SELECT * FROM gastos_dmc_items WHERE gasto_id IN ($in) ORDER BY id_item");
+                $itQ->execute($ids);
+                foreach ($itQ->fetchAll() as $it) {
+                    $itemsPorGasto[$it['gasto_id']][] = $it;
+                }
+            }
+        } catch (Exception $e) { /* tabla aun no existe: se ignora, usa fallback descripcion/subtotal */ }
+
+        foreach ($rows as &$g) {
+            $g['items'] = $itemsPorGasto[$g['id_gasto']] ?? [];
+        }
+        return $rows;
     }
 
     public static function obtener(int $id): ?array {

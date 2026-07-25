@@ -4884,35 +4884,43 @@ async function cargarGastos() {
   const cat    = document.getElementById('filtroGastoCategoria')?.value|| '';
   const r = await api(`controllers/GastosController.php?action=listar&anio=${anio}&mes=${mes}&estado=${estado}&categoria=${cat}`);
   if (!r.ok) { toast('Error al cargar gastos.', 'error'); return; }
-  const rows = r.data.data || [];
-  const lote = 8;
-  for (let i = 0; i < rows.length; i += lote) {
-    await Promise.all(rows.slice(i, i + lote).map(async g => {
-      const ri = await api(`controllers/GastosController.php?action=obtener&id=${g.id_gasto}`);
-      if (ri.ok) g.items = ri.data.data?.items || [];
-    }));
-  }
-  gastosData = rows;
+  gastosData = r.data.data || []; // items ya vienen incluidos desde el backend
   filtrarGastosLocal();
   if (mes && anio) cargarResumenGastos(mes, anio);
+}
+
+function filtrarGastosLocal() {
+  const buscar = (document.getElementById('buscarGastoProveedor')?.value || '').toLowerCase().trim();
+  const cat    = document.getElementById('filtroGastoCategoria')?.value || '';
+  let filtrados = gastosData;
+  if (cat) filtrados = filtrados.filter(g => g.categoria === cat);
+  if (buscar) {
+    filtrados = filtrados.filter(g =>
+      (g.nombre_proveedor||'').toLowerCase().includes(buscar) ||
+      (g.numero_factura||'').toLowerCase().includes(buscar) ||
+      (g.rtn_proveedor||'').toLowerCase().includes(buscar)
+    );
+  }
+  renderTablaGastos(filtrados);
 }
 
 function renderTablaGastos(rows) {
   const wrap = document.getElementById('tablaGastosWrap');
   if (!wrap) return;
+  wrap.style.overflowX = 'auto';
   if (!rows.length) { wrap.innerHTML = '<p class="empty-state">Sin registros.</p>'; return; }
   const pag = paginar('gastos', rows);
   const fL  = n => 'L. ' + Number(n||0).toLocaleString('es-HN', {minimumFractionDigits:2});
-  let h = `<table><thead><tr>
+  let h = `<table style="min-width:1100px"><thead><tr>
     <th>Fecha</th><th>Proveedor / RTN</th><th>N° Documento</th>
     <th>Categoría</th><th>Descripción / Ítems</th>
     <th style="text-align:right">Subtotal</th><th style="text-align:right">ISV</th>
-    <th style="text-align:right">Total</th><th>Ded.</th><th>Estado</th><th>Acciones</th>
+    <th style="text-align:right">Total</th><th>Ded.</th><th>Estado</th><th style="width:80px">Acciones</th>
   </tr></thead><tbody>`;
   pag.slice.forEach(g => {
     const eb  = g.estado==='declarado' ? '<span class="badge badge-green">Declarado</span>' : '<span class="badge badge-yellow">Pendiente</span>';
     const acc = g.estado==='declarado' ? '<span style="font-size:11px;color:var(--muted)">🔒</span>'
-      : `<div class="td-actions"><button class="btn btn-sm btn-secondary" onclick="editarGasto(${g.id_gasto})">Editar</button><button class="btn btn-sm btn-danger" onclick="eliminarGasto(${g.id_gasto})">Eliminar</button></div>`;
+      : `<div class="td-actions" style="display:flex;gap:4px;flex-wrap:nowrap;white-space:nowrap"><button class="btn btn-sm btn-secondary" style="padding:4px 8px" onclick="editarGasto(${g.id_gasto})">✏️</button><button class="btn btn-sm btn-danger" style="padding:4px 8px" onclick="eliminarGasto(${g.id_gasto})">🗑️</button></div>`;
     const tieneItems = g.items && g.items.length > 1;
     let itemsHTML = '';
     if (tieneItems) {
@@ -4920,9 +4928,6 @@ function renderTablaGastos(rows) {
         <thead><tr>
           <th style="text-align:left;padding:2px 6px;color:var(--muted)">Descripción</th>
           <th style="text-align:right;padding:2px 6px;color:var(--muted)">Cant.</th>
-          <th style="text-align:right;padding:2px 6px;color:var(--muted)">P.Unit.</th>
-          <th style="text-align:right;padding:2px 6px;color:var(--muted)">Subtotal</th>
-          <th style="text-align:right;padding:2px 6px;color:var(--muted)">ISV</th>
           <th style="text-align:right;padding:2px 6px;color:var(--muted)">Total</th>
         </tr></thead><tbody>`;
       g.items.forEach(it => {
@@ -4931,10 +4936,7 @@ function renderTablaGastos(rows) {
         itemsHTML += `<tr>
           <td style="padding:2px 6px">${it.descripcion}</td>
           <td style="text-align:right;padding:2px 6px">${cant2}</td>
-          <td style="text-align:right;padding:2px 6px">${fL(it.monto)}</td>
-          <td style="text-align:right;padding:2px 6px">${fL(it.total_item||totalItem)}</td>
-          <td style="text-align:right;padding:2px 6px">${fL(it.isv)}</td>
-          <td style="text-align:right;padding:2px 6px;font-weight:600">${fL(it.total)}</td>
+          <td style="text-align:right;padding:2px 6px;font-weight:600">${fL(it.total_item||totalItem)}</td>
         </tr>`;
       });
       itemsHTML += '</tbody></table>';
@@ -4983,6 +4985,21 @@ function abrirModalGasto() {
   renderGastoItems();
   agregarItemGasto();
   abrirModal('modalGasto');
+}
+
+function validarRTN() {
+  const rtnEl = document.getElementById('gastoRTN');
+  const msgEl = document.getElementById('rtnMsg');
+  if (!rtnEl || !msgEl) return;
+  const rtn = (rtnEl.value || '').replace(/\D/g, '');
+  if (!rtn) { msgEl.textContent = ''; msgEl.style.color = 'var(--muted)'; return; }
+  if ([13, 14].includes(rtn.length)) {
+    msgEl.textContent = '✓ RTN válido';
+    msgEl.style.color = '#4caf50';
+  } else {
+    msgEl.textContent = 'RTN debe tener 13 o 14 dígitos';
+    msgEl.style.color = 'var(--danger)';
+  }
 }
 
 async function editarGasto(id) {
