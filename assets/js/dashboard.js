@@ -193,6 +193,7 @@ function irPagina(modulo, pagina) {
     cxc:            () => renderTablaCxC(datosModulo[modulo]),
     empleados:      () => renderTablaEmpleados(datosModulo[modulo]),
     planillas_list: () => renderTablaPlanillas(datosModulo[modulo]),
+    gastos:         () => renderTablaGastos(datosModulo[modulo]),
     reporte:        () => renderReporte({ data: datosModulo[modulo] }),
   };
   if (renders[modulo]) renders[modulo]();
@@ -2297,23 +2298,67 @@ let facturarCotId = null;
 
 async function abrirModalFacturar(cotizacion_id) {
   facturarCotId = cotizacion_id;
-  // Verificar CAI activo antes de abrir
   const rCai = await api('controllers/FacturacionController.php?action=cai_activo');
   if (!rCai.ok || !rCai.data.data) {
     toast('No hay CAI activo. Configure el CAI antes de facturar.', 'error');
     setTimeout(() => abrirModalCAI(), 800);
     return;
   }
-  // Reset modal método pago cotización
   facturarMetodoPago = '';
   document.querySelectorAll('.metodo-cot-btn').forEach(el => {
     el.style.borderColor = 'var(--border)'; el.style.background = '';
   });
-  document.getElementById('facturarCotRefGrupo').style.display = 'none';
-  document.getElementById('facturarCotRef').value = '';
-  document.getElementById('errFacturarCot').style.display = 'none';
+  document.getElementById('facturarCotRefGrupo').style.display   = 'none';
+  document.getElementById('facturarCotRef').value                = '';
+  document.getElementById('errFacturarCot').style.display        = 'none';
   document.getElementById('facturarCotNotaMetodo').style.display = 'none';
+  const resEl = document.getElementById('facturarCotResumen');
+  if (resEl) resEl.innerHTML = '<p style="color:var(--muted);font-size:12px">Cargando resumen...</p>';
   abrirModal('modalFacturarCotizacion');
+
+  if (!resEl) return; // modal viejo sin panel de resumen: nada más que hacer
+
+  const rCot = await api('controllers/CotizacionesController.php?action=obtener&id=' + cotizacion_id);
+  if (!rCot.ok) { resEl.innerHTML = '<p style="color:var(--danger);font-size:12px">Error cargando cotización.</p>'; return; }
+  const c = rCot.data.data;
+  const subBruto = (c.detalle || []).reduce((a,d) => a + (d.cantidad * d.precio_unitario), 0);
+  const descMto  = parseFloat(c.descuento_monto || 0);
+  const descPct  = parseFloat(c.descuento_porcentaje || 0);
+  const baseIsv  = Math.max(0, subBruto - descMto);
+  const isv      = Math.round(baseIsv * 0.15 * 100) / 100;
+  const total    = Math.round((baseIsv + isv) * 100) / 100;
+
+  let resumen = `
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">
+      Resumen — ${c.numero_cotizacion}
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px">
+      Cliente: <strong style="color:var(--text)">${c.cliente || '—'}</strong>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13px;color:var(--muted)">
+      <span>Materiales</span><span>${fmtMoneda(c.subtotal_materiales)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13px;color:var(--muted)">
+      <span>Mano de obra</span><span>${fmtMoneda(c.subtotal_mano_obra)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;border-top:1px solid var(--border);margin-top:4px">
+      <span style="color:var(--muted)">SUB-TOTAL</span><strong>${fmtMoneda(subBruto)}</strong>
+    </div>`;
+  if (descMto > 0) {
+    resumen += `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13px;color:#c0392b">
+      <span>DESC./REBAJA${descPct > 0 ? ' (' + descPct + '%)' : ''}</span>
+      <strong>${fmtMoneda(descMto)}</strong>
+    </div>`;
+  }
+  resumen += `
+    <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13px;color:var(--muted)">
+      <span>ISV 15%</span><strong style="color:var(--text)">${fmtMoneda(isv)}</strong>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:6px 0;border-top:2px solid var(--border);margin-top:4px">
+      <strong style="font-size:14px">TOTAL A FACTURAR</strong>
+      <strong style="font-size:15px;color:var(--accent)">${fmtMoneda(total)}</strong>
+    </div>`;
+  resEl.innerHTML = resumen;
 }
 
 let facturarMetodoPago = '';
@@ -4890,7 +4935,7 @@ async function cargarGastos() {
 }
 
 function filtrarGastosLocal() {
-  const buscar = (document.getElementById('buscarGastoProveedor')?.value || '').toLowerCase().trim();
+  const buscar = (document.getElementById('buscarGasto')?.value || '').toLowerCase().trim();
   const cat    = document.getElementById('filtroGastoCategoria')?.value || '';
   let filtrados = gastosData;
   if (cat) filtrados = filtrados.filter(g => g.categoria === cat);
@@ -4901,6 +4946,7 @@ function filtrarGastosLocal() {
       (g.rtn_proveedor||'').toLowerCase().includes(buscar)
     );
   }
+  paginaActual['gastos'] = 1;
   renderTablaGastos(filtrados);
 }
 
@@ -5139,9 +5185,30 @@ async function guardarGasto() {
 }
 
 async function eliminarGasto(id){if(!await confirmDialog('¿Eliminar este registro?'))return;const r=await api('controllers/GastosController.php?action=eliminar',{method:'POST',body:JSON.stringify({id})});if(r.ok){toast('Gasto eliminado.','success');cargarGastos();}else toast(r.data?.error||'Error.','error');}
+async function cargarResumenGastos(mes, anio) {
+  const cont = document.getElementById('gastosResumen');
+  const btnDiv = document.getElementById('gastosBtnDeclarar');
+  if (!cont) return;
+  const r = await api(`controllers/GastosController.php?action=resumen&mes=${mes}&anio=${anio}`);
+  if (!r.ok) { cont.innerHTML = ''; if (btnDiv) btnDiv.style.display = 'none'; return; }
+  const d = r.data.data || {};
+  const fL = n => 'L. ' + Number(n||0).toLocaleString('es-HN', {minimumFractionDigits:2});
+  cont.innerHTML = `
+    <div class="kpi-card"><div class="kpi-label">Registros</div><div class="kpi-val">${d.total_registros||0}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Subtotal s/ISV</div><div class="kpi-val" style="color:#4caf50">${fL(d.total_subtotal)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">ISV Total</div><div class="kpi-val">${fL(d.total_isv)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total General</div><div class="kpi-val" style="color:#4caf50">${fL(d.total_general)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Deducible ISR</div><div class="kpi-val" style="color:#2196f3">${fL(d.total_deducible)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">No Deducible</div><div class="kpi-val" style="color:var(--danger)">${fL(d.total_no_deducible)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Pendiente SAR</div><div class="kpi-val" style="color:orange">${fL(d.total_pendiente)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Declarado</div><div class="kpi-val" style="color:#4caf50">${fL(d.total_declarado)}</div></div>
+  `;
+  if (btnDiv) btnDiv.style.display = (parseFloat(d.total_pendiente) > 0) ? '' : 'none';
+}
+
 async function marcarPeriodoDeclarado(){const mes=parseInt(document.getElementById('filtroGastoMes')?.value||0);const anio=parseInt(document.getElementById('filtroGastoAnio')?.value||0);if(!mes||!anio){toast('Selecciona mes y año.','error');return;}if(!await confirmDialog(`¿Marcar todos los gastos pendientes de ${MESES_GASTOS[mes]} ${anio} como declarados?
 
-No podrán editarse ni eliminarse después.`))return;const r=await api('controllers/GastosController.php?action=marcar_declarado',{method:'POST',body:JSON.stringify({mes,anio})});if(r.ok){toast(`${r.data.actualizados} gasto(s) declarados.`,'success');cargarGastos();}else toast(r.data?.error||'Error.','error');}
+No podrán editarse ni eliminarse después.`))return;const r=await api('controllers/GastosController.php?action=declarar_mes',{method:'POST',body:JSON.stringify({mes,anio})});if(r.ok){toast(`${r.data.actualizados} gasto(s) declarados.`,'success');cargarGastos();}else toast(r.data?.error||'Error.','error');}
 // ══════════════════════════════════════════════════════════
 // MÓDULO: CATÁLOGO DE PRECIOS
 // ══════════════════════════════════════════════════════════

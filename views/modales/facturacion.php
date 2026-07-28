@@ -157,30 +157,9 @@
     <div id="fdItemsWrap" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px"></div>
     <button class="btn btn-secondary btn-sm" onclick="fdAgregarItem()" style="margin-bottom:12px">+ Agregar ítem</button>
     <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 16px;text-align:right;font-size:13px;line-height:2.2;margin-bottom:14px">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <span style="color:var(--muted)">Subtotal (sin ISV):</span>
-        <strong id="fdSubtotal">L. 0.00</strong>
-      </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-        <span style="color:var(--muted);white-space:nowrap">Desc. (%):</span>
-        <input type="number" id="fdDescPct" min="0" max="100" step="0.01" value="0"
-          style="width:70px;padding:3px 6px;background:var(--surface);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px;text-align:right"
-          oninput="fdRecalcular()">
-      </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-        <span style="color:var(--muted);white-space:nowrap">Rebaja (L.):</span>
-        <input type="number" id="fdDescMto" min="0" step="0.01" value="0"
-          style="width:90px;padding:3px 6px;background:var(--surface);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px;text-align:right"
-          oninput="fdRecalcular()">
-      </div>
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <span style="color:var(--muted)">ISV 15%:</span>
-        <strong id="fdISV">L. 0.00</strong>
-      </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--border);padding-top:6px;margin-top:4px">
-        <span style="font-size:15px;font-weight:600">TOTAL:</span>
-        <strong id="fdTotal" style="font-size:16px;color:var(--accent)">L. 0.00</strong>
-      </div>
+      <span style="color:var(--muted)">Subtotal (sin ISV):</span> <strong id="fdSubtotal">L. 0.00</strong><br>
+      <span style="color:var(--muted)">ISV 15%:</span> <strong id="fdISV">L. 0.00</strong><br>
+      <span style="font-size:16px;color:var(--accent)">TOTAL: <strong id="fdTotal">L. 0.00</strong></span>
     </div>
     <div class="form-group">
       <label>Método de pago *</label>
