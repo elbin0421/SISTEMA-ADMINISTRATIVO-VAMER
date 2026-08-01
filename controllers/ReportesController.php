@@ -19,6 +19,8 @@ match(true) {
     $action === 'retenciones'                               => reporteRetenciones($format),
     $action === 'planilla_pdf'                              => planillaPDF(),
     $action === 'planilla_excel'                            => planillaExcel(),
+    $action === 'boucher_pdf'                                => boucherPDF(),
+    $action === 'boucher_todos_pdf'                          => boucherTodosPDF(),
     $action === 'inventario' || $action === 'inventario_mov'=> reporteInventario($format),
     $action === 'rentabilidad'||$action==='rentabilidad_ot' => reporteRentabilidad($format),
     default => jsonResponder(400, ['error' => 'Accion no valida'])
@@ -102,7 +104,7 @@ function planillaPDF(): void {
         .'<div class="box">Deducciones<strong>'.$f($p['total_deducciones']).'</strong></div>'
         .'<div class="box">Neto a pagar<strong>'.$f($p['total_neto']).'</strong></div>'
         .'</div>';
-    echo '<table><thead><tr><th>Empleado</th><th>Ubic.</th><th>Sal.Quincenal</th><th>H.Extra</th><th>Mto.HE</th><th style="color:#e8a020">Viáticos</th><th>D.Falt.</th><th>Desc.Falt.</th>';
+    echo '<table><thead><tr><th>Empleado</th><th>Ubic.</th><th>Sal.Quincenal</th><th>H.Extra</th><th>Mto.HE</th><th>D.Falt.</th><th>Desc.Falt.</th>';
     if($mostrarSeguro) echo '<th>Seguro</th>';
     echo '<th>Abo.Prest.</th><th>Abo.Vale</th><th>Total Ded.</th><th>NETO</th></tr></thead><tbody>';
     foreach($p['detalle'] as $d){
@@ -112,7 +114,6 @@ function planillaPDF(): void {
             .'<td>'.$f($d['salario_base']).'</td>'
             .'<td style="text-align:center">'.((float)($d['horas_extra']??0)>0?$d['horas_extra']:'—').'</td>'
             .'<td>'.((float)($d['monto_horas_extra']??0)>0?$f($d['monto_horas_extra']):'—').'</td>'
-            .'<td style="color:#b07d00;font-weight:600">'.($f((float)($d['viatico_s1']??0)+(float)($d['viatico_s2']??0)+(float)($d['viatico_s3']??0)+(float)($d['viatico_s4']??0))).'</td>'
             .'<td style="text-align:center">'.((float)($d['dias_faltados']??0)>0?$d['dias_faltados']:'—').'</td>'
             .'<td>'.((float)($d['monto_dias_faltados']??0)>0?$f($d['monto_dias_faltados']):'—').'</td>';
         if($mostrarSeguro) echo '<td>'.$f($d['seguro_privado']).'</td>';
@@ -123,7 +124,7 @@ function planillaPDF(): void {
             .'</tr>';
     }
     echo '<tr class="tot"><td class="l" colspan="2"><strong>TOTALES</strong></td>'
-        .'<td>'.$f($p['total_salarios']).'</td><td colspan="2">—</td><td>'.$f(array_sum(array_column($p['detalle'],'viatico_s1'))+array_sum(array_column($p['detalle'],'viatico_s2'))+array_sum(array_column($p['detalle'],'viatico_s3'))+array_sum(array_column($p['detalle'],'viatico_s4'))).'</td><td colspan="2">—</td>';
+        .'<td>'.$f($p['total_salarios']).'</td><td colspan="4">—</td>';
     if($mostrarSeguro) echo '<td>'.$f($p['total_seguro']).'</td>';
     echo '<td colspan="2">—</td><td>'.$f($p['total_deducciones']).'</td><td>'.$f($p['total_neto']).'</td></tr>';
     echo '</tbody></table>';
@@ -133,7 +134,154 @@ function planillaPDF(): void {
     exit;
 }
 
-// ── Excel Planilla ────────────────────────────────────────────
+// ── Boucher de Pago (individual) ────────────────────────────────
+function boucherPDF(): void {
+    $id  = (int)($_GET['id'] ?? 0);       // id_planilla
+    $emp = (int)($_GET['empleado_id'] ?? 0);
+    $p   = PlanillaModel::obtener($id);
+    if (!$p) { http_response_code(404); echo 'Planilla no encontrada'; exit; }
+    $det = null;
+    foreach ($p['detalle'] as $d) { if ((int)$d['empleado_id'] === $emp) { $det = $d; break; } }
+    if (!$det) { http_response_code(404); echo 'Empleado no encontrado en esta planilla'; exit; }
+
+    header('Content-Type: text/html; charset=UTF-8');
+    echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Boucher de Pago</title>';
+    echo boucherEstilos();
+    echo '</head><body>';
+    echo renderBoucherHTML($p, $det);
+    echo '<script>window.onload=()=>window.print();</script></body></html>';
+    exit;
+}
+
+// ── Boucher de Pago (todos los empleados de la planilla) ────────
+function boucherTodosPDF(): void {
+    $id = (int)($_GET['id'] ?? 0);
+    $p  = PlanillaModel::obtener($id);
+    if (!$p) { http_response_code(404); echo 'Planilla no encontrada'; exit; }
+    if (empty($p['detalle'])) { http_response_code(404); echo 'Sin empleados en esta planilla'; exit; }
+
+    header('Content-Type: text/html; charset=UTF-8');
+    echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Bouchers de Pago</title>';
+    echo boucherEstilos();
+    echo '</head><body>';
+    $total = count($p['detalle']);
+    $i = 0;
+    foreach ($p['detalle'] as $det) {
+        $i++;
+        echo '<div class="boucher-page"' . ($i < $total ? ' style="page-break-after:always"' : '') . '>';
+        echo renderBoucherHTML($p, $det);
+        echo '</div>';
+    }
+    echo '<script>window.onload=()=>window.print();</script></body></html>';
+    exit;
+}
+
+function boucherEstilos(): string {
+    return '<style>
+      body{font-family:Arial,sans-serif;font-size:11px;margin:0;padding:0;color:#1a1a2e}
+      .boucher-page{padding:22px}
+      .bh-header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1a1a2e;padding-bottom:10px;margin-bottom:14px}
+      .bh-header h2{margin:0;font-size:16px}
+      .bh-header .sub{color:#666;font-size:10px;margin-top:2px}
+      .bh-header .right{text-align:right;font-size:10px;color:#666}
+      .bh-header .right strong{display:block;font-size:13px;color:#1a1a2e}
+      .bh-info{display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;background:#f5f5f5;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:11px}
+      .bh-info span{color:#666}
+      .bh-info strong{color:#1a1a2e}
+      table.bh-tabla{width:100%;border-collapse:collapse;margin-bottom:14px}
+      table.bh-tabla th{background:#1a1a2e;color:#fff;padding:6px 8px;text-align:left;font-size:10px}
+      table.bh-tabla td{border:1px solid #ddd;padding:6px 8px;font-size:10.5px}
+      table.bh-tabla td.r{text-align:right}
+      .bh-totales{display:flex;justify-content:flex-end;margin-bottom:20px}
+      .bh-totales table{border-collapse:collapse;font-size:11px;min-width:260px}
+      .bh-totales td{padding:4px 10px}
+      .bh-totales td:last-child{text-align:right;font-weight:600}
+      .bh-totales tr.neto td{border-top:2px solid #1a1a2e;font-size:14px;font-weight:bold;color:#1a1a2e;padding-top:8px}
+      .bh-firmas{display:flex;justify-content:space-between;margin-top:50px;text-align:center}
+      .bh-firmas div{width:42%;border-top:1px solid #333;padding-top:5px;font-size:10px;color:#555}
+      .bh-footer{margin-top:24px;font-size:8.5px;color:#999;text-align:center}
+      @media print{.boucher-page{padding:15px}}
+    </style>';
+}
+
+function renderBoucherHTML(array $p, array $d): string {
+    $f = fn($n) => 'L. ' . number_format((float)$n, 2, '.', ',');
+    $mes = PlanillaModel::nombreMes((int)$p['periodo_mes']);
+    $quincenaLbl = ($p['quincena'] ?? '1ra') === '1ra' ? '1ra Quincena' : '2da Quincena';
+    $tieneViatico = ((float)($d['viatico_s1']??0) + (float)($d['viatico_s2']??0) + (float)($d['viatico_s3']??0) + (float)($d['viatico_s4']??0)) > 0;
+    $totalViatico = (float)($d['viatico_s1']??0) + (float)($d['viatico_s2']??0) + (float)($d['viatico_s3']??0) + (float)($d['viatico_s4']??0);
+    $empresaNombre = $d['empresa_nombre'] ?? null;
+    if (!$empresaNombre && !empty($d['empleado_id'])) {
+        // Fallback: buscar directamente la empresa del empleado si no vino en el JOIN
+        try {
+            $pdo2 = getDB();
+            $q = $pdo2->prepare("SELECT emp.nombre FROM empleados e LEFT JOIN empresas emp ON emp.id_empresa = e.empresa_id WHERE e.id_empleado = ?");
+            $q->execute([(int)$d['empleado_id']]);
+            $empresaNombre = $q->fetchColumn() ?: null;
+        } catch (Exception $e) { $empresaNombre = null; }
+    }
+    if (!$empresaNombre) $empresaNombre = 'SOLDYMEG';
+
+    $h  = '<div class="bh-header">';
+    $h .= '<div><h2>' . htmlspecialchars($empresaNombre) . '</h2><div class="sub">Comprobante de Pago de Nómina</div></div>';
+    $h .= '<div class="right">N° Planilla<strong>#' . str_pad((string)$p['id_planilla'], 5, '0', STR_PAD_LEFT) . '</strong></div>';
+    $h .= '</div>';
+
+    $h .= '<div class="bh-info">';
+    $h .= '<div><span>Empleado:</span> <strong>' . htmlspecialchars($d['empleado']) . '</strong></div>';
+    $h .= '<div><span>Puesto:</span> <strong>' . htmlspecialchars($d['puesto'] ?? '—') . '</strong></div>';
+    $h .= '<div><span>Período:</span> <strong>' . htmlspecialchars($mes . ' ' . $p['periodo_anio'] . ' — ' . $quincenaLbl) . '</strong></div>';
+    $h .= '<div><span>Fecha de pago:</span> <strong>' . htmlspecialchars($p['fecha_pago']) . '</strong></div>';
+    $h .= '<div><span>Ubicación:</span> <strong>' . htmlspecialchars($d['ubicacion'] ?? '—') . '</strong></div>';
+    $h .= '<div><span>Banco / Cuenta:</span> <strong>' . htmlspecialchars(($d['banco'] ?? '—') . ' / ' . ($d['cuenta_banco'] ?? '—')) . '</strong></div>';
+    $h .= '</div>';
+
+    $h .= '<table class="bh-tabla"><thead><tr><th>Concepto</th><th style="text-align:right">Monto</th></tr></thead><tbody>';
+    $h .= '<tr><td>Salario quincenal</td><td class="r">' . $f($d['salario_base']) . '</td></tr>';
+    if ((float)($d['horas_extra'] ?? 0) > 0) {
+        $h .= '<tr><td>Horas extra (' . htmlspecialchars($d['horas_extra']) . ' hrs)</td><td class="r">' . $f($d['monto_horas_extra']) . '</td></tr>';
+    }
+    if ($tieneViatico) {
+        $h .= '<tr><td>Viáticos</td><td class="r">' . $f($totalViatico) . '</td></tr>';
+    }
+    $h .= '</tbody></table>';
+
+    $h .= '<table class="bh-tabla"><thead><tr><th>Deducciones</th><th style="text-align:right">Monto</th></tr></thead><tbody>';
+    if ((float)($d['dias_faltados'] ?? 0) > 0) {
+        $h .= '<tr><td>Días faltados (' . htmlspecialchars($d['dias_faltados']) . ')</td><td class="r">' . $f($d['monto_dias_faltados']) . '</td></tr>';
+    }
+    if ((float)($d['seguro_privado'] ?? 0) > 0 && !empty($d['aplicar_seguro'])) {
+        $h .= '<tr><td>Seguro privado</td><td class="r">' . $f($d['seguro_privado']) . '</td></tr>';
+    }
+    if ((float)($d['abono_prestamo'] ?? 0) > 0) {
+        $h .= '<tr><td>Abono a préstamo</td><td class="r">' . $f($d['abono_prestamo']) . '</td></tr>';
+    }
+    if ((float)($d['abono_vale'] ?? 0) > 0) {
+        $h .= '<tr><td>Abono a vale</td><td class="r">' . $f($d['abono_vale']) . '</td></tr>';
+    }
+    if ((float)($d['total_deducciones'] ?? 0) == 0) {
+        $h .= '<tr><td colspan="2" style="color:#999;text-align:center">Sin deducciones</td></tr>';
+    }
+    $h .= '</tbody></table>';
+
+    $devengado = (float)$d['salario_base'] + (float)($d['monto_horas_extra'] ?? 0) + $totalViatico;
+    $h .= '<div class="bh-totales"><table>';
+    $h .= '<tr><td>Total devengado</td><td>' . $f($devengado) . '</td></tr>';
+    $h .= '<tr><td>Total deducciones</td><td>-' . $f($d['total_deducciones']) . '</td></tr>';
+    $h .= '<tr class="neto"><td>NETO A PAGAR</td><td>' . $f($d['salario_neto']) . '</td></tr>';
+    $h .= '</table></div>';
+
+    $h .= '<div class="bh-firmas">';
+    $h .= '<div>Firma del Empleado</div>';
+    $h .= '<div>Firma Autorizada</div>';
+    $h .= '</div>';
+
+    $h .= '<div class="bh-footer">Generado el ' . date('d/m/Y H:i') . ' | Documento interno de nómina — no válido como factura fiscal</div>';
+
+    return $h;
+}
+
+
 function planillaExcel(): void {
     $id=(int)($_GET['id']??0);
     $p=PlanillaModel::obtener($id);
@@ -148,20 +296,18 @@ function planillaExcel(): void {
     fputcsv($out,["SOLDYMEG - Planilla {$quincena} Quincena - {$mes} {$p['periodo_anio']}"]);
     fputcsv($out,['Fecha pago: '.$p['fecha_pago'],'Estado: '.$p['estado']]);
     fputcsv($out,[]);
-    $cab=['Empleado','Puesto','Ubicacion','Sal. Quincenal','Horas Extra','Monto HE','Viaticos','Dias Faltados','Desc. Faltados'];
+    $cab=['Empleado','Puesto','Ubicacion','Sal. Quincenal','Horas Extra','Monto HE','Dias Faltados','Desc. Faltados'];
     if($quincena==='2da') $cab[]='Seguro';
     array_push($cab,'Abono Prestamo','Abono Vale','Total Deducciones','Neto a Pagar');
     fputcsv($out,$cab);
     foreach($p['detalle'] as $d){
-        $vt2=((float)($d['viatico_s1']??0)+(float)($d['viatico_s2']??0)+(float)($d['viatico_s3']??0)+(float)($d['viatico_s4']??0));
-        $fila=[$d['empleado'],$d['puesto']??'',$d['ubicacion']??'',$d['salario_base'],$d['horas_extra']??0,$d['monto_horas_extra']??0,$vt2,$d['dias_faltados']??0,$d['monto_dias_faltados']??0];
+        $fila=[$d['empleado'],$d['puesto']??'',$d['ubicacion']??'',$d['salario_base'],$d['horas_extra']??0,$d['monto_horas_extra']??0,$d['dias_faltados']??0,$d['monto_dias_faltados']??0];
         if($quincena==='2da') $fila[]=$d['seguro_privado']??0;
         array_push($fila,$d['abono_prestamo']??0,$d['abono_vale']??0,$d['total_deducciones'],$d['salario_neto']);
         fputcsv($out,$fila);
     }
     fputcsv($out,[]);
-    $vtot=array_sum(array_column($p['detalle'],'viatico_s1'))+array_sum(array_column($p['detalle'],'viatico_s2'))+array_sum(array_column($p['detalle'],'viatico_s3'))+array_sum(array_column($p['detalle'],'viatico_s4'));
-    $tot=['TOTALES','','',$p['total_salarios'],'','',$vtot,'',''];
+    $tot=['TOTALES','','',$p['total_salarios'],'','','',''];
     if($quincena==='2da') $tot[]=$p['total_seguro'];
     array_push($tot,'','',$p['total_deducciones'],$p['total_neto']);
     fputcsv($out,$tot);

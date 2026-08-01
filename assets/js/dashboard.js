@@ -3529,7 +3529,7 @@ async function verDetallePlanilla(id) {
       <th style="color:#e8a020">Viáticos</th>
       <th>Días Falt.</th><th>Desc.</th>
       <th>Seguro</th><th>Abono Prest.</th><th>Abono Vale</th>
-      <th>Total Ded.</th><th>NETO A PAGAR</th>
+      <th>Total Ded.</th><th>NETO A PAGAR</th><th>Boucher</th>
     </tr></thead>
     <tbody>`;
   p.detalle.forEach(d => {
@@ -3550,6 +3550,7 @@ async function verDetallePlanilla(id) {
       <td>${parseFloat(d.abono_vale||0)>0 ? fmtMoneda(d.abono_vale) : '—'}</td>
       <td style="color:var(--danger)">${fmtMoneda(d.total_deducciones)}</td>
       <td><strong style="color:var(--accent)">${fmtMoneda(d.salario_neto)}</strong></td>
+      <td><a href="controllers/ReportesController.php?action=boucher_pdf&id=${id}&empleado_id=${d.empleado_id}" target="_blank" class="btn btn-sm btn-secondary" title="Generar boucher individual">🧾</a></td>
     </tr>`;
   });
   h += `</tbody></table></div>`;
@@ -3558,6 +3559,7 @@ async function verDetallePlanilla(id) {
     <button class="btn btn-secondary" onclick="cerrarModal('modalDetallePlanilla')">Cerrar</button>
     <a href="controllers/ReportesController.php?action=planilla_pdf&id=${id}" target="_blank" class="btn btn-secondary">📄 PDF</a>
     <a href="controllers/ReportesController.php?action=planilla_excel&id=${id}" class="btn btn-secondary">⬇️ Excel</a>
+    <a href="controllers/ReportesController.php?action=boucher_todos_pdf&id=${id}" target="_blank" class="btn btn-primary">🧾 Generar Todos los Bouchers</a>
     ${p.estado==='borrador' ? `<button class="btn btn-primary" onclick="cerrarModal('modalDetallePlanilla');cerrarPlanilla(${id})">✓ Cerrar Planilla</button>` : ''}
   `;
 }
@@ -3941,7 +3943,7 @@ async function verDetalleEspecial(id) {
     <div><div style="color:var(--muted);font-size:11px">FECHA PAGO</div><strong>${p.fecha_pago}</strong></div>
   </div>
   <div class="table-wrap"><table>
-    <thead><tr><th>Empleado</th><th>Empresa</th><th>Ubic.</th><th>Sal. Mensual</th><th>Fecha Ingreso</th><th>Estado</th><th>Monto</th></tr></thead><tbody>`;
+    <thead><tr><th>Empleado</th><th>Empresa</th><th>Ubic.</th><th>Sal. Mensual</th><th>Fecha Ingreso</th><th>Estado</th><th>Monto</th><th>Boucher</th></tr></thead><tbody>`;
   (p.detalle||[]).forEach(d=>{
     const excl=d.observaciones==='EXCLUIDO';
     h+=`<tr style="${excl?'opacity:.5':''}">
@@ -3952,12 +3954,14 @@ async function verDetalleEspecial(id) {
       <td style="font-size:12px;color:var(--muted)">${d.fecha_ingreso||'—'}</td>
       <td>${excl?'<span class="badge badge-red">EXCLUIDO</span>':'<span class="badge badge-green">Incluido</span>'}</td>
       <td><strong style="color:${excl?'var(--danger)':'var(--accent)'}">${excl?'—':fmtMoneda(d.salario_neto)}</strong></td>
+      <td>${excl?'—':`<a href="controllers/ReportesController.php?action=boucher_pdf&id=${id}&empleado_id=${d.empleado_id}" target="_blank" class="btn btn-sm btn-secondary" title="Generar boucher individual">🧾</a>`}</td>
     </tr>`;
   });
   h+='</tbody></table></div>';
   document.getElementById('contenidoDetalleEspecial').innerHTML=h;
   document.getElementById('footerDetalleEspecial').innerHTML=`
     <button class="btn btn-secondary" onclick="cerrarModal('modalDetalleEspecial')">Cerrar</button>
+    <a href="controllers/ReportesController.php?action=boucher_todos_pdf&id=${id}" target="_blank" class="btn btn-primary">🧾 Generar Todos los Bouchers</a>
     ${p.estado==='borrador'?`<button class="btn btn-primary" onclick="cerrarModal('modalDetalleEspecial');cerrarEspecial(${id})">✓ Cerrar Planilla</button>`:''}`;
 }
 
