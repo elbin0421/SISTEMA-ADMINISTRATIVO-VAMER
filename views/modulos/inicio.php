@@ -31,13 +31,13 @@
 
   <!-- Gráfico + Cotizaciones -->
   <div style="display:grid;grid-template-columns:1fr 370px;gap:16px;margin-bottom:16px" id="inicioFila2">
-    <div class="card" style="margin-bottom:0">
+    <div class="card" style="margin-bottom:0;display:flex;flex-direction:column">
       <div class="card-header">
         <h4>📈 Ingresos mensuales</h4>
         <span style="font-size:12px;color:var(--muted)">Últimos 6 meses</span>
       </div>
-      <div style="position:relative;height:220px">
-        <canvas id="graficoIngresos"></canvas>
+      <div style="position:relative;flex:1;min-height:320px;width:100%">
+        <canvas id="graficoIngresos" style="position:absolute;inset:0;width:100%!important;height:100%!important"></canvas>
         <div id="graficoLoading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px">Cargando...</div>
       </div>
     </div>

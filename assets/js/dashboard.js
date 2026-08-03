@@ -2081,6 +2081,7 @@ function renderTablaFacturas(rows) {
       <td>${badgeEstado(f.estado)}</td>
       <td><div class="td-actions">
         <button class="btn btn-sm btn-secondary" onclick="verDetalleFactura(${f.id_factura})">Ver</button>
+        <a href="controllers/FacturaPDFController.php?id=${f.id_factura}" target="_blank" class="btn btn-sm btn-secondary">📄 PDF</a>
         ${f.estado !== 'anulada' && f.estado !== 'pagada' ? `<button class="btn btn-sm btn-danger" onclick="abrirAnulacion(${f.id_factura},'${f.numero_factura}')">Anular</button>` : ''}
       </div></td>
     </tr>`;
@@ -2139,7 +2140,10 @@ async function verDetalleFactura(id) {
 
   // Footer dinámico según estado
   const footer = document.getElementById('footerDetalleFactura');
-  footer.innerHTML = '<button class="btn btn-secondary" onclick="cerrarModal(\'modalDetalleFactura\')">Cerrar</button>';
+  footer.innerHTML = `
+    <button class="btn btn-secondary" onclick="cerrarModal('modalDetalleFactura')">Cerrar</button>
+    <a href="controllers/FacturaPDFController.php?id=${id}" target="_blank" class="btn btn-primary">📄 Generar PDF</a>
+  `;
 }
 
 // ── FACTURA DIRECTA (sin cotización) ────────────────────
