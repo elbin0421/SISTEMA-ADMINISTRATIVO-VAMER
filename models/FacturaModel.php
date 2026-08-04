@@ -42,7 +42,8 @@ class FacturaModel {
                    cot.numero_cotizacion,
                    ot.numero_orden,
                    cai.cai AS cai_codigo, cai.fecha_limite_emision,
-                   cai.establecimiento, cai.punto_emision
+                   cai.establecimiento, cai.punto_emision,
+                   cai.rango_inicio, cai.rango_fin
             FROM facturas f
             JOIN clientes cl  ON cl.id_cliente  = f.cliente_id
             JOIN usuarios u   ON u.id_usuario   = f.usuario_id

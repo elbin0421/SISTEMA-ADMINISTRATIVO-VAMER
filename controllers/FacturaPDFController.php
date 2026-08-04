@@ -85,11 +85,7 @@ function generarPDF(array $f): void {
   /* ── ENCABEZADO ── */
   .top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 6px; }
   .logo-block { display: flex; gap: 10px; align-items: flex-start; }
-  .logo-circle {
-    width: 62px; height: 62px; border: 3px solid #1a1a1a; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-family: 'Georgia', serif; font-size: 26px; font-weight: bold; flex-shrink: 0;
-  }
+  .logo-img { width: 68px; height: auto; flex-shrink: 0; }
   .empresa-nombre { font-size: 20px; font-weight: bold; letter-spacing: 1px; margin-top: 4px; }
   .empresa-datos { font-size: 20px; font-weight: bold; line-height: 1.25; margin-bottom: 2px; }
   .empresa-info { font-size: 10px; line-height: 1.5; margin-top: 3px; }
@@ -163,7 +159,7 @@ function generarPDF(array $f): void {
   <!-- ENCABEZADO -->
   <div class="top">
     <div class="logo-block">
-      <div class="logo-circle">H</div>
+      <img src="../assets/img/VAMER.png" alt="VAMER" class="logo-img" onerror="this.style.display='none'">
       <div>
         <div class="empresa-datos">VENTAS AMERICA SOCIEDAD DE<br>RESPONSABILIDAD LIMITADA</div>
         <div class="empresa-info">

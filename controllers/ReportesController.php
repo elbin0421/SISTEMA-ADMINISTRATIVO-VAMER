@@ -104,16 +104,20 @@ function planillaPDF(): void {
         .'<div class="box">Deducciones<strong>'.$f($p['total_deducciones']).'</strong></div>'
         .'<div class="box">Neto a pagar<strong>'.$f($p['total_neto']).'</strong></div>'
         .'</div>';
-    echo '<table><thead><tr><th>Empleado</th><th>Ubic.</th><th>Sal.Quincenal</th><th>H.Extra</th><th>Mto.HE</th><th>D.Falt.</th><th>Desc.Falt.</th>';
+    echo '<table><thead><tr><th>Empleado</th><th>Ubic.</th><th>Sal.Quincenal</th><th>H.Extra</th><th>Mto.HE</th><th style="color:#e8a020">Viáticos</th><th>D.Falt.</th><th>Desc.Falt.</th>';
     if($mostrarSeguro) echo '<th>Seguro</th>';
     echo '<th>Abo.Prest.</th><th>Abo.Vale</th><th>Total Ded.</th><th>NETO</th></tr></thead><tbody>';
+    $totalViaticosPlanilla = 0;
     foreach($p['detalle'] as $d){
+        $viaticoFila = (float)($d['viatico_s1']??0)+(float)($d['viatico_s2']??0)+(float)($d['viatico_s3']??0)+(float)($d['viatico_s4']??0);
+        $totalViaticosPlanilla += $viaticoFila;
         echo '<tr>'
             .'<td class="l">'.htmlspecialchars($d['empleado']).'<br><small>'.htmlspecialchars($d['puesto']??'').'</small></td>'
             .'<td style="text-align:center">'.($d['ubicacion']??'').'</td>'
             .'<td>'.$f($d['salario_base']).'</td>'
             .'<td style="text-align:center">'.((float)($d['horas_extra']??0)>0?$d['horas_extra']:'—').'</td>'
             .'<td>'.((float)($d['monto_horas_extra']??0)>0?$f($d['monto_horas_extra']):'—').'</td>'
+            .'<td style="color:#b07d00;font-weight:600">'.($viaticoFila>0?$f($viaticoFila):'—').'</td>'
             .'<td style="text-align:center">'.((float)($d['dias_faltados']??0)>0?$d['dias_faltados']:'—').'</td>'
             .'<td>'.((float)($d['monto_dias_faltados']??0)>0?$f($d['monto_dias_faltados']):'—').'</td>';
         if($mostrarSeguro) echo '<td>'.$f($d['seguro_privado']).'</td>';
@@ -124,7 +128,7 @@ function planillaPDF(): void {
             .'</tr>';
     }
     echo '<tr class="tot"><td class="l" colspan="2"><strong>TOTALES</strong></td>'
-        .'<td>'.$f($p['total_salarios']).'</td><td colspan="4">—</td>';
+        .'<td>'.$f($p['total_salarios']).'</td><td colspan="2">—</td><td>'.$f($totalViaticosPlanilla).'</td><td colspan="2">—</td>';
     if($mostrarSeguro) echo '<td>'.$f($p['total_seguro']).'</td>';
     echo '<td colspan="2">—</td><td>'.$f($p['total_deducciones']).'</td><td>'.$f($p['total_neto']).'</td></tr>';
     echo '</tbody></table>';
@@ -296,18 +300,21 @@ function planillaExcel(): void {
     fputcsv($out,["SOLDYMEG - Planilla {$quincena} Quincena - {$mes} {$p['periodo_anio']}"]);
     fputcsv($out,['Fecha pago: '.$p['fecha_pago'],'Estado: '.$p['estado']]);
     fputcsv($out,[]);
-    $cab=['Empleado','Puesto','Ubicacion','Sal. Quincenal','Horas Extra','Monto HE','Dias Faltados','Desc. Faltados'];
+    $cab=['Empleado','Puesto','Ubicacion','Sal. Quincenal','Horas Extra','Monto HE','Viaticos','Dias Faltados','Desc. Faltados'];
     if($quincena==='2da') $cab[]='Seguro';
     array_push($cab,'Abono Prestamo','Abono Vale','Total Deducciones','Neto a Pagar');
     fputcsv($out,$cab);
+    $totalViaticosPlanilla=0;
     foreach($p['detalle'] as $d){
-        $fila=[$d['empleado'],$d['puesto']??'',$d['ubicacion']??'',$d['salario_base'],$d['horas_extra']??0,$d['monto_horas_extra']??0,$d['dias_faltados']??0,$d['monto_dias_faltados']??0];
+        $viaticoFila=(float)($d['viatico_s1']??0)+(float)($d['viatico_s2']??0)+(float)($d['viatico_s3']??0)+(float)($d['viatico_s4']??0);
+        $totalViaticosPlanilla+=$viaticoFila;
+        $fila=[$d['empleado'],$d['puesto']??'',$d['ubicacion']??'',$d['salario_base'],$d['horas_extra']??0,$d['monto_horas_extra']??0,$viaticoFila,$d['dias_faltados']??0,$d['monto_dias_faltados']??0];
         if($quincena==='2da') $fila[]=$d['seguro_privado']??0;
         array_push($fila,$d['abono_prestamo']??0,$d['abono_vale']??0,$d['total_deducciones'],$d['salario_neto']);
         fputcsv($out,$fila);
     }
     fputcsv($out,[]);
-    $tot=['TOTALES','','',$p['total_salarios'],'','','',''];
+    $tot=['TOTALES','','',$p['total_salarios'],'','',$totalViaticosPlanilla,'',''];
     if($quincena==='2da') $tot[]=$p['total_seguro'];
     array_push($tot,'','',$p['total_deducciones'],$p['total_neto']);
     fputcsv($out,$tot);
