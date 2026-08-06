@@ -168,6 +168,27 @@ $sesion = requireAuth();
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="assets/js/dashboard.js"></script>
+<!-- dashboard.js separado en módulos para mantenibilidad — cargar EN ESTE ORDEN -->
+<script src="assets/js/modules/core.js"></script>
+<script src="assets/js/modules/inicio.js"></script>
+<script src="assets/js/modules/clientes.js"></script>
+<script src="assets/js/modules/inventario.js"></script>
+<script src="assets/js/modules/proveedores.js"></script>
+<script src="assets/js/modules/compras.js"></script>
+<script src="assets/js/modules/ordenes.js"></script>
+<script src="assets/js/modules/usuarios.js"></script>
+<script src="assets/js/modules/cotizaciones.js"></script>
+<script src="assets/js/modules/facturacion.js"></script>
+<script src="assets/js/modules/libro_ventas.js"></script>
+<script src="assets/js/modules/cai.js"></script>
+<script src="assets/js/modules/pagos.js"></script>
+<script src="assets/js/modules/planillas.js"></script>
+<script src="assets/js/modules/reportes.js"></script>
+<script src="assets/js/modules/facturar_multiple.js"></script>
+<script src="assets/js/modules/vehiculos.js"></script>
+<script src="assets/js/modules/vacaciones.js"></script>
+<script src="assets/js/modules/gastos.js"></script>
+<script src="assets/js/modules/catalogo.js"></script>
+<script src="assets/js/modules/requisiciones.js"></script>
 </body>
 </html>
