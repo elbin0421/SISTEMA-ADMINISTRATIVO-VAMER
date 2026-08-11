@@ -96,6 +96,10 @@ async function cargarInicio() {
     if (_chartIngresos) { _chartIngresos.destroy(); _chartIngresos = null; }
     const rows = rGraf.data.data || [];
     const textColor = '#888';
+    const ctx2d = canvas.getContext('2d');
+    const gradiente = ctx2d.createLinearGradient(0, 0, 0, canvas.height || 220);
+    gradiente.addColorStop(0, 'rgba(52,211,153,0.95)');
+    gradiente.addColorStop(1, 'rgba(21,128,61,0.85)');
     _chartIngresos = new Chart(canvas, {
       type: 'bar',
       data: {
@@ -103,11 +107,11 @@ async function cargarInicio() {
         datasets: [{
           label: 'Ingresos (L.)',
           data: rows.map(r => parseFloat(r.total)),
-          backgroundColor: 'rgba(232,160,32,0.75)',
-          borderColor: 'rgba(232,160,32,1)',
-          borderWidth: 2,
+          backgroundColor: gradiente,
+          borderColor: 'rgba(52,211,153,1)',
+          borderWidth: 1,
           borderRadius: 6,
-          hoverBackgroundColor: 'rgba(232,160,32,0.95)',
+          hoverBackgroundColor: 'rgba(74,222,128,0.95)',
         }]
       },
       options: {

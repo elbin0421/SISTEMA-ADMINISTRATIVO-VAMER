@@ -31,7 +31,7 @@ function reporteVentas(string $format): void {
     $pdo=getDB();
     $where="WHERE f.estado!='anulada' AND YEAR(f.fecha)=?"; $params=[(int)$anio];
     if($mes){$where.=" AND MONTH(f.fecha)=?";$params[]=(int)$mes;}
-    $stmt=$pdo->prepare("SELECT f.numero_factura,f.fecha,cl.nombre AS cliente,f.subtotal,f.isv,f.total,f.estado,f.metodo_pago,COALESCE(pg.pagado,0) AS pagado,f.total-COALESCE(pg.pagado,0) AS pendiente FROM facturas f JOIN clientes cl ON cl.id_cliente=f.cliente_id LEFT JOIN(SELECT factura_id,SUM(monto) AS pagado FROM pagos_clientes WHERE estado='aplicado' GROUP BY factura_id)pg ON pg.factura_id=f.id_factura $where ORDER BY f.fecha ASC");
+    $stmt=$pdo->prepare("SELECT f.numero_factura,f.fecha,cl.nombre AS cliente,f.subtotal,f.isv,f.total,f.estado,f.metodo_pago,COALESCE(pg.pagado,0) AS pagado,f.total-COALESCE(pg.pagado,0) AS pendiente FROM facturas f JOIN clientes cl ON cl.id_cliente=f.cliente_id LEFT JOIN(SELECT factura_id,SUM(monto) AS pagado FROM pagos_clientes WHERE estado='aplicado' GROUP BY factura_id)pg ON pg.factura_id=f.id_factura $where ORDER BY f.fecha DESC");
     $stmt->execute($params); $rows=$stmt->fetchAll();
     $tot=['cantidad'=>count($rows),'subtotal'=>array_sum(array_column($rows,'subtotal')),'isv'=>array_sum(array_column($rows,'isv')),'total'=>array_sum(array_column($rows,'total')),'pagado'=>array_sum(array_column($rows,'pagado')),'pendiente'=>array_sum(array_column($rows,'pendiente'))];
     if($format==='excel') exportarExcel($rows,'ventas',"Reporte_Ventas_{$anio}");

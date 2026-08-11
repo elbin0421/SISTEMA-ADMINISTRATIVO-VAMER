@@ -20,6 +20,7 @@ $sesion = requireAuth();
   <!-- Cabecera: logo + botón hamburguesa -->
   <div class="sidebar-logo">
     <div style="display:flex;align-items:center;gap:10px">
+      
       <div class="vamer-hex">V</div>
       <div class="sb-logo-text"><h2>VAMER</h2><p>Ventas America S. de R.L</p></div>
     </div>
