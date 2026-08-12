@@ -30,35 +30,71 @@ match(true) {
 //   3 años exactos → 15 días
 //   4+ años        → 20 días
 function diasVacaciones(int $aniosCompletos): int {
-    if ($aniosCompletos < 1)  return 0;   // Menos de 1 año: no tiene derecho
+    if ($aniosCompletos < 1)  return 0;   // Menos de 1 año: no tiene derecho a TOMAR (ver proporcional)
     if ($aniosCompletos === 1) return 10;
     if ($aniosCompletos === 2) return 12;
     if ($aniosCompletos === 3) return 15;
     return 20; // 4 o más años
 }
 
-function calcularVacacion(array $emp, string $fechaInicio, string $fechaFin): array {
-    $inicio = new DateTime($fechaInicio);
-    $fin    = new DateTime($fechaFin);
-    $diff   = $inicio->diff($fin);
+// Días proporcionales acumulados para empleados con MENOS de 1 año cumplido.
+// Se prorratea el primer tramo (10 días/año) según los meses completos trabajados.
+// Ej: 6 meses trabajados -> (10 * 6) / 12 = 5.0 días acumulados (informativo).
+function diasProporcionales(int $mesesCompletos): float {
+    return round((10 * $mesesCompletos) / 12, 2);
+}
 
-    // Años COMPLETOS cumplidos (no decimales — igual que cumpleaños)
+// ── Cálculo único y central de antigüedad ──────────────────────
+// SIEMPRE se calcula desde la fecha de ingreso REAL del empleado
+// (columna empleados.fecha_ingreso) hasta la fecha de referencia.
+// Esto es intencional: la antigüedad NUNCA debe depender de las
+// fechas de "período laboral" que se escriban en el formulario de
+// una vacación puntual — si dependiera de esas fechas, dos registros
+// del mismo empleado podrían calcular años de servicio distintos.
+function calcularAntiguedad(string $fechaIngreso, string $fechaReferencia): array {
+    $ingreso = new DateTime($fechaIngreso);
+    $ref     = new DateTime($fechaReferencia);
+    $diff    = $ingreso->diff($ref);
+
     $aniosCompletos = (int)$diff->y;
-    // Para mostrar referencia: años + meses como decimal
-    $aniosDecimal   = round($aniosCompletos + ($diff->m / 12), 2);
+    $mesesCompletos = (int)$diff->m;
+    $aniosDecimal   = round($aniosCompletos + ($mesesCompletos / 12), 2);
+    $tieneDerecho   = $aniosCompletos >= 1;
 
-    $dias  = diasVacaciones($aniosCompletos);
+    if ($tieneDerecho) {
+        $dias = diasVacaciones($aniosCompletos);
+    } else {
+        $mesesTotales = ($aniosCompletos * 12) + $mesesCompletos;
+        $dias = diasProporcionales($mesesTotales);
+    }
 
+    return [
+        'anios_completos' => $aniosCompletos,
+        'anios_decimal'   => $aniosDecimal,
+        'dias'            => $dias,
+        'aplica'          => $tieneDerecho,      // puede REGISTRAR/tomar vacación
+        'proporcional'    => !$tieneDerecho,     // días son un acumulado informativo, aún no disponibles para tomar
+    ];
+}
+
+function calcularVacacion(array $emp, string $fechaInicio, string $fechaFin): array {
+    // La antigüedad se calcula desde la fecha de ingreso real del empleado,
+    // NO desde $fechaInicio (que es la fecha del período de esta vacación puntual).
+    $fechaIngreso = $emp['fecha_ingreso'] ?? $fechaInicio;
+    $ant = calcularAntiguedad($fechaIngreso, $fechaFin);
+
+    $dias = $ant['dias'];
     $salarioDiario = round((float)$emp['salario_mensual'] / 30, 4);
     $monto         = round($salarioDiario * $dias, 2);
 
     return [
-        'anios_laborados'       => $aniosDecimal,
-        'anios_completos'       => $aniosCompletos,
+        'anios_laborados'       => $ant['anios_decimal'],
+        'anios_completos'       => $ant['anios_completos'],
         'dias_correspondientes' => $dias,
         'salario_diario'        => $salarioDiario,
         'monto_vacaciones'      => $monto,
-        'aplica'                => $dias > 0,
+        'aplica'                => $ant['aplica'],
+        'proporcional'          => $ant['proporcional'],
     ];
 }
 
@@ -135,25 +171,25 @@ function resumen(): void {
     ");
     $rows = $stmt->fetchAll();
 
-    // Calcular días actuales que le corresponden según fecha de ingreso
-    $hoy = new DateTime();
+    // Calcular días actuales que le corresponden según fecha de ingreso real
+    // (misma función central que usa el modal de registro, para que ambos
+    // lados del sistema siempre coincidan en el resultado).
+    $hoy = (new DateTime())->format('Y-m-d');
     foreach ($rows as &$r) {
         if ($r['fecha_ingreso']) {
-            $ingreso        = new DateTime($r['fecha_ingreso']);
-            $diff           = $ingreso->diff($hoy);
-            $aniosCompletos = (int)$diff->y;
-            $aniosDecimal   = round($aniosCompletos + ($diff->m / 12), 2);
-            $diasCorr       = diasVacaciones($aniosCompletos);
-            $salDiario      = round((float)$r['salario_mensual'] / 30, 2);
-            $r['anios_actuales'] = $aniosDecimal;
-            $r['anios_completos']= $aniosCompletos;
-            $r['dias_actuales']  = $diasCorr;
-            $r['salario_diario'] = $salDiario;
-            $r['monto_actual']   = round($salDiario * $diasCorr, 2);
+            $ant       = calcularAntiguedad($r['fecha_ingreso'], $hoy);
+            $salDiario = round((float)$r['salario_mensual'] / 30, 2);
+            $r['anios_actuales']  = $ant['anios_decimal'];
+            $r['anios_completos'] = $ant['anios_completos'];
+            $r['dias_actuales']   = $ant['dias'];
+            $r['proporcional']    = $ant['proporcional'];
+            $r['salario_diario']  = $salDiario;
+            $r['monto_actual']    = round($salDiario * $ant['dias'], 2);
         } else {
             $r['anios_actuales']  = 0;
             $r['anios_completos'] = 0;
             $r['dias_actuales']   = 0;
+            $r['proporcional']    = false;
             $r['salario_diario']  = 0;
             $r['monto_actual']    = 0;
         }
@@ -269,7 +305,7 @@ function editar(array $sesion): void {
     $pdo = getDB();
     // Obtener registro actual con salario del empleado
     $stmtVac = $pdo->prepare("
-        SELECT v.*, e.salario_mensual
+        SELECT v.*, e.salario_mensual, e.fecha_ingreso
         FROM vacaciones v
         JOIN empleados e ON e.id_empleado = v.empleado_id
         WHERE v.id_vacacion = ?
@@ -278,7 +314,7 @@ function editar(array $sesion): void {
     $vac = $stmtVac->fetch();
     if (!$vac) { responder(404, ['error' => 'Registro no encontrado.']); return; }
 
-    $emp  = ['salario_mensual' => $vac['salario_mensual']];
+    $emp  = ['salario_mensual' => $vac['salario_mensual'], 'fecha_ingreso' => $vac['fecha_ingreso']];
     $calc = calcularVacacion($emp, $fechaInicio, $fechaFin);
     if (!$calc['aplica']) {
         responder(400, ['error' => 'El período no alcanza 1 año laborado.']); return;
