@@ -62,6 +62,10 @@
     tr:last-child td { border-bottom:none; }
     tr:hover td { background:rgba(0,200,83,.04); }
     .td-actions { display:flex; gap:5px; flex-wrap:wrap; }
+    .td-sub { font-size:11px; color:var(--muted); }
+    table.table-compact { font-size:12px; min-width:0; table-layout:auto; }
+    table.table-compact th, table.table-compact td { padding:7px 6px; }
+    table.table-compact .btn-sm { padding:3px 6px; font-size:12px; }
 
     /* BADGES */
     .badge { display:inline-block; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:600; white-space:nowrap; }

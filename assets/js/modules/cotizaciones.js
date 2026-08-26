@@ -273,6 +273,8 @@ function abrirModalCotizacionDirecta() {
   document.getElementById('cotDirCant').value = '1';
   document.getElementById('cotDirPrecio').value = '';
   document.getElementById('cotDirPlaca').value = '';
+  document.getElementById('cotDirDescPct').value = '0';
+  document.getElementById('cotDirDescMto').value = '0';
   document.getElementById('errCotDir').style.display = 'none';
   const selVeh = document.getElementById('cotDirVehiculoSelect');
   if (selVeh) selVeh.innerHTML = '<option value="">— Sin vehículo / No aplica —</option>';
@@ -341,19 +343,38 @@ function agregarItemCotDir() {
   if (!desc || isNaN(cant) || cant <= 0 || isNaN(precio) || precio < 0) {
     toast('Completa descripción, cantidad y precio.', 'warn'); return;
   }
-  itemsCotDir.push({ descripcion: desc, tipo, cantidad: cant, precio_unitario: precio });
+  itemsCotDir.push({ descripcion: desc, tipo, cantidad: cant, precio_unitario: precio, descuento_porcentaje: 0, descuento_monto: 0 });
   document.getElementById('cotDirDesc').value = '';
   document.getElementById('cotDirCant').value = '1';
   document.getElementById('cotDirPrecio').value = '';
   renderItemsCotDir();
 }
 
+function itemNetoCotDir(it) {
+  const sub  = it.cantidad * it.precio_unitario;
+  const desc = it.descuento_porcentaje > 0 ? sub * it.descuento_porcentaje / 100 : (it.descuento_monto || 0);
+  return Math.max(0, sub - desc);
+}
+
+function actualizarItemDescPctCotDir(i, val) {
+  itemsCotDir[i].descuento_porcentaje = parseFloat(val) || 0;
+  const netoCell = document.getElementById('netoItemCotDir' + i);
+  if (netoCell) netoCell.textContent = fmtMoneda(itemNetoCotDir(itemsCotDir[i]));
+  recalcCotDir();
+}
+
+function actualizarItemDescMontoCotDir(i, val) {
+  itemsCotDir[i].descuento_monto = parseFloat(val) || 0;
+  const netoCell = document.getElementById('netoItemCotDir' + i);
+  if (netoCell) netoCell.textContent = fmtMoneda(itemNetoCotDir(itemsCotDir[i]));
+  recalcCotDir();
+}
+
 function renderItemsCotDir() {
   const tbody = document.getElementById('itemsCotDirBody');
   if (!itemsCotDir.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Sin ítems</td></tr>';
-    document.getElementById('cotDirSubtotalMostrar').textContent = 'L. 0.00';
-    document.getElementById('cotDirTotalMostrar').textContent    = 'L. 0.00';
+    tbody.innerHTML = '<tr><td colspan="9" class="empty-state">Sin ítems</td></tr>';
+    recalcCotDir();
     return;
   }
   tbody.innerHTML = itemsCotDir.map((it, i) => {
@@ -363,16 +384,39 @@ function renderItemsCotDir() {
       <td>${it.descripcion}</td><td>${it.cantidad}</td>
       <td>${fmtMoneda(it.precio_unitario)}</td>
       <td>${fmtMoneda(sub)}</td>
-      <td><button class="btn btn-sm btn-danger" onclick="quitarItemCotDir(${i})">✕</button>
-          <button class="btn btn-sm btn-secondary" onclick="guardarItemEnCatalogo('${it.descripcion.replace(/'/g,"\\'")}','${it.tipo}',${it.precio_unitario})" title="Guardar al catálogo de precios">💾</button></td>
+      <td><input type="number" min="0" max="100" step="0.01" value="${it.descuento_porcentaje || 0}"
+            oninput="actualizarItemDescPctCotDir(${i}, this.value)"
+            style="width:64px;padding:4px 6px;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px;text-align:right"></td>
+      <td><input type="number" min="0" step="0.01" value="${it.descuento_monto || 0}"
+            oninput="actualizarItemDescMontoCotDir(${i}, this.value)"
+            style="width:76px;padding:4px 6px;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px;text-align:right"></td>
+      <td id="netoItemCotDir${i}">${fmtMoneda(itemNetoCotDir(it))}</td>
+      <td><div class="td-actions">
+          <button class="btn btn-sm btn-danger" onclick="quitarItemCotDir(${i})" title="Quitar">✕</button>
+          <button class="btn btn-sm btn-secondary" onclick="guardarItemEnCatalogo('${it.descripcion.replace(/'/g,"\\'")}','${it.tipo}',${it.precio_unitario})" title="Guardar al catálogo de precios">💾</button>
+      </div></td>
     </tr>`;
   }).join('');
-  const subtotal = itemsCotDir.reduce((a, it) => a + it.cantidad * it.precio_unitario, 0);
-  // Los precios ingresados ya llevan margen. Solo se agrega ISV 15%.
-  const totalEst = subtotal * 1.15;
-  document.getElementById('cotDirSubtotalMostrar').textContent = fmtMoneda(subtotal);
-  document.getElementById('cotDirTotalMostrar').textContent    = fmtMoneda(totalEst);
+  recalcCotDir();
 }
+
+function recalcCotDir() {
+  const subtotalNeto = itemsCotDir.reduce((a, it) => a + itemNetoCotDir(it), 0);
+  const isv          = round2(subtotalNeto * 0.15);
+  const totalPreDesc = round2(subtotalNeto + isv);
+
+  const descGlobalPct = parseFloat(document.getElementById('cotDirDescPct')?.value) || 0;
+  const descGlobalMto = descGlobalPct > 0
+    ? round2(totalPreDesc * descGlobalPct / 100)
+    : (parseFloat(document.getElementById('cotDirDescMto')?.value) || 0);
+  const totalFinal = Math.max(0, round2(totalPreDesc - descGlobalMto));
+
+  document.getElementById('cotDirSubtotalMostrar').textContent = fmtMoneda(subtotalNeto);
+  document.getElementById('cotDirISVMostrar').textContent      = fmtMoneda(isv);
+  document.getElementById('cotDirTotalMostrar').textContent    = fmtMoneda(totalFinal);
+}
+
+function round2(n) { return Math.round((n + Number.EPSILON) * 100) / 100; }
 
 function quitarItemCotDir(i) { itemsCotDir.splice(i, 1); renderItemsCotDir(); }
 
@@ -383,12 +427,14 @@ async function guardarCotizacionDirecta() {
   if (!clienteId)          { errEl.textContent = 'Selecciona un cliente.';            errEl.style.display = 'block'; return; }
   if (!itemsCotDir.length) { errEl.textContent = 'Agrega al menos un ítem.';          errEl.style.display = 'block'; return; }
   const body = {
-    cliente_id:    clienteId,
-    vigencia_dias: +document.getElementById('cotDirVigencia').value || 15,
-    observaciones: document.getElementById('cotDirObs').value.trim(),
-    ot_cliente:    document.getElementById('cotDirOtCliente').value.trim(),
-    orden_compra:  document.getElementById('cotDirOrdenCompra').value.trim(),
-    unidad:        document.getElementById('cotDirPlaca').value.trim(),
+    cliente_id:            clienteId,
+    vigencia_dias:         +document.getElementById('cotDirVigencia').value || 15,
+    observaciones:         document.getElementById('cotDirObs').value.trim(),
+    ot_cliente:            document.getElementById('cotDirOtCliente').value.trim(),
+    orden_compra:          document.getElementById('cotDirOrdenCompra').value.trim(),
+    unidad:                document.getElementById('cotDirPlaca').value.trim(),
+    descuento_porcentaje:  parseFloat(document.getElementById('cotDirDescPct').value) || 0,
+    descuento_monto:       parseFloat(document.getElementById('cotDirDescMto').value) || 0,
     items: itemsCotDir,
   };
   const r = await api('controllers/CotizacionesController.php?action=directa', {

@@ -13,6 +13,7 @@ const MODULE_GROUP = {
   vehiculos: 'operaciones', requisiciones: 'operaciones',
   cotizaciones: 'comercial', facturacion: 'comercial', cai: 'comercial',
   libro_ventas: 'comercial', pagos: 'comercial', gastos: 'comercial', catalogo: 'comercial',
+  movimientos: 'comercial',
   planillas: 'rrhh', vacaciones: 'rrhh',
   reportes: 'analisis',
 };
@@ -91,7 +92,7 @@ function updateClock() {
 updateClock(); setInterval(updateClock, 1000);
 
 // ── NAVEGACIÓN ───────────────────────────────────────────────
-const modTitles = { inicio:'Inicio', clientes:'Clientes', vehiculos:'Vehículos', inventario:'Inventario', requisiciones:'Requisiciones de Materiales', compras:'Compras', proveedores:'Proveedores', ordenes:'Órdenes de Trabajo', usuarios:'Usuarios', roles:'Roles y Permisos', cotizaciones:'Cotizaciones', catalogo:'Catálogo de Precios', facturacion:'Facturación', libro_ventas:'Libro de Ventas', vacaciones:'Vacaciones', gastos:'Gastos DMC / SAR Honduras' };
+const modTitles = { inicio:'Inicio', clientes:'Clientes', vehiculos:'Vehículos', inventario:'Inventario', requisiciones:'Requisiciones de Materiales', compras:'Compras', proveedores:'Proveedores', ordenes:'Órdenes de Trabajo', usuarios:'Usuarios', roles:'Roles y Permisos', cotizaciones:'Cotizaciones', movimientos:'Movimientos', catalogo:'Catálogo de Precios', facturacion:'Facturación', libro_ventas:'Libro de Ventas', vacaciones:'Vacaciones', gastos:'Gastos DMC / SAR Honduras' };
 document.querySelectorAll('.nav-item[data-module]').forEach(el => {
   el.addEventListener('click', function() {
     const mod = this.dataset.module;
@@ -110,6 +111,7 @@ document.querySelectorAll('.nav-item[data-module]').forEach(el => {
       proveedores: cargarProveedores, ordenes: cargarOrdenes, usuarios: cargarUsuarios,
       roles: cargarRoles, cotizaciones: cargarCotizaciones, facturacion: cargarFacturacion,
       catalogo: cargarCatalogo, requisiciones: cargarRequisiciones,
+      movimientos: () => { if (typeof cargarMovimientos === 'function') cargarMovimientos(); },
       libro_ventas: () => {},
       pagos:     () => { if (typeof cargarModuloPagos    === 'function') cargarModuloPagos(); },
       planillas: () => { if (typeof cargarModuloPlanillas=== 'function') cargarModuloPlanillas(); },
@@ -199,6 +201,7 @@ function irPagina(modulo, pagina) {
     empleados:      () => renderTablaEmpleados(datosModulo[modulo]),
     planillas_list: () => renderTablaPlanillas(datosModulo[modulo]),
     gastos:         () => renderTablaGastos(datosModulo[modulo]),
+    movimientos:    () => renderTablaMovimientos(datosModulo[modulo]),
     reporte:        () => renderReporte({ data: datosModulo[modulo] }),
   };
   if (renders[modulo]) renders[modulo]();

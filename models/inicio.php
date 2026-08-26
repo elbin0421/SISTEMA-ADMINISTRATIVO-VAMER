@@ -39,9 +39,9 @@
     <div class="kpi-card" style="border-left:4px solid #3ea8e0">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div>
-          <div class="kpi-label">🔧 OT en proceso</div>
+          <div class="kpi-label">🚛 Movimientos pendientes de facturar</div>
           <div class="kpi-val" id="kpiOTProceso" style="color:#3ea8e0">—</div>
-          <div class="kpi-sub">órdenes activas</div>
+          <div class="kpi-sub">movimientos sin factura</div>
         </div>
         <div style="font-size:30px;opacity:.15">🔧</div>
       </div>

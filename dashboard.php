@@ -76,6 +76,7 @@ $sesion = requireAuth();
       </div>
       <div class="nav-group-body">
         <a class="nav-item" data-module="cotizaciones"  title="Cotizaciones"><span class="nav-icon">📑</span><span class="nav-text">Cotizaciones</span></a>
+        <a class="nav-item" data-module="movimientos"   title="Movimientos"><span class="nav-icon">🚛</span><span class="nav-text">Movimientos</span></a>
         <a class="nav-item" data-module="catalogo"      title="Catálogo de Precios"><span class="nav-icon">📂</span><span class="nav-text">Catálogo de Precios</span></a>
         <a class="nav-item" data-module="facturacion"   title="Facturación"><span class="nav-icon">💳</span><span class="nav-text">Facturación</span></a>
         <a class="nav-item" data-module="cai"           title="CAI"><span class="nav-icon">🏷️</span><span class="nav-text">CAI</span></a>
@@ -136,7 +137,7 @@ $sesion = requireAuth();
     <?php
     $modulos = [
       'inicio','clientes','vehiculos','inventario','requisiciones','compras','proveedores',
-      'ordenes','cotizaciones','catalogo','facturacion','cai','libro_ventas',
+      'ordenes','cotizaciones','movimientos','catalogo','facturacion','cai','libro_ventas',
       'pagos','planillas','vacaciones','gastos','reportes','usuarios_roles',
     ];
     foreach ($modulos as $mod) {
@@ -146,7 +147,7 @@ $sesion = requireAuth();
 
     $modales = [
       'clientes','vehiculos','inventario','compras_proveedores',
-      'ordenes','cotizaciones','catalogo_precios','facturacion',
+      'ordenes','cotizaciones','movimientos','catalogo_precios','facturacion',
       'pagos','planillas','planillas_especiales','vacaciones','gastos','usuarios','requisicion',
     ];
     foreach ($modales as $modal) {
@@ -188,6 +189,7 @@ $sesion = requireAuth();
 <script src="assets/js/modules/facturar_multiple.js"></script>
 <script src="assets/js/modules/vehiculos.js"></script>
 <script src="assets/js/modules/vacaciones.js"></script>
+<script src="assets/js/modules/movimientos.js"></script>
 <script src="assets/js/modules/gastos.js"></script>
 <script src="assets/js/modules/catalogo.js"></script>
 <script src="assets/js/modules/requisiciones.js"></script>

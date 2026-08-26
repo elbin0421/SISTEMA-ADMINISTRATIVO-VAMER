@@ -34,9 +34,9 @@ function kpisDashboard(): void {
           )");
     $ocPend = $s->fetch();
 
-    // OT en proceso
-    $s = $pdo->query("SELECT COUNT(*) FROM ordenes_trabajo WHERE estado='en_proceso'");
-    $otProceso = (int)$s->fetchColumn();
+    // Movimientos pendientes de facturar
+    $s = $pdo->query("SELECT COUNT(*) FROM movimientos WHERE estado='pendiente'");
+    $movPend = (int)$s->fetchColumn();
 
     // Stock bajo mínimo
     $s = $pdo->query("SELECT COUNT(*) FROM materiales WHERE estado='activo' AND stock_minimo>0 AND stock<=stock_minimo");
@@ -56,7 +56,7 @@ function kpisDashboard(): void {
 
     responder(200, ['ok'=>true,'data'=>[
         'ventas_dia'=>$ventasDia, 'cxc'=>$cxc, 'oc_pend'=>$ocPend,
-        'ot_proceso'=>$otProceso, 'stock_bajo'=>$stockBajo,
+        'ot_proceso'=>$movPend, 'stock_bajo'=>$stockBajo,
         'cotizaciones'=>$cotizaciones, 'ot_recientes'=>$otRecientes,
     ]]);
 }

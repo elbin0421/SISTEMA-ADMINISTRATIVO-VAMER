@@ -196,4 +196,56 @@ class FacturacionService {
         }
     }
 
+    /**
+     * Factura varios movimientos (MAERSK/ALPLA) pendientes en una sola factura.
+     * Todos los movimientos deben ser del mismo cliente y estar en estado 'pendiente'.
+     */
+    public static function facturarMovimientos(array $movimiento_ids, array $opciones, int $usuario_id): array {
+        require_once __DIR__ . '/../models/MovimientoModel.php';
+
+        $movimiento_ids = array_map('intval', $movimiento_ids);
+        if (empty($movimiento_ids)) throw new Exception('Sin movimientos seleccionados.');
+
+        $movimientos = [];
+        $cliente_id  = null;
+        foreach ($movimiento_ids as $mid) {
+            $mov = MovimientoModel::obtener($mid);
+            if (!$mov) throw new Exception("Movimiento #$mid no encontrado.");
+            if ($mov['estado'] !== 'pendiente')
+                throw new Exception("El movimiento #$mid ya fue facturado o está anulado.");
+            if (empty($mov['cliente_id']))
+                throw new Exception("El movimiento #$mid no tiene cliente asignado.");
+            if ($cliente_id === null) $cliente_id = (int)$mov['cliente_id'];
+            elseif ((int)$mov['cliente_id'] !== $cliente_id)
+                throw new Exception('Todos los movimientos deben ser del mismo cliente.');
+            $movimientos[] = $mov;
+        }
+
+        // Armar los ítems de la factura a partir de cada movimiento
+        $items = [];
+        foreach ($movimientos as $mov) {
+            $partes = array_filter([
+                $mov['tipo'],
+                $mov['flete']      ?: null,
+                $mov['destino']    ? 'Destino: ' . $mov['destino']       : null,
+                $mov['contenedor'] ? 'Contenedor: ' . $mov['contenedor'] : null,
+            ]);
+            $items[] = [
+                'tipo'            => 'movimiento',
+                'descripcion'     => implode(' · ', $partes),
+                'cantidad'        => 1,
+                'precio_unitario' => (float)$mov['tarifa'],
+            ];
+        }
+
+        $opciones['cliente_id'] = $cliente_id;
+
+        // FacturaModel::crearDirecta ya maneja su propia transacción internamente.
+        $factura_id = FacturaModel::crearDirecta($opciones, $items, $usuario_id);
+        MovimientoModel::marcarFacturados($movimiento_ids, $factura_id);
+
+        $factura = FacturaModel::obtener($factura_id);
+        return ['ok' => true, 'factura' => $factura];
+    }
+
 }

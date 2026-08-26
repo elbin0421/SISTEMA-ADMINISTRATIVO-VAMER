@@ -26,6 +26,7 @@ match(true) {
     $action === 'cai_activo'       && $method === 'GET'  => caiActivo(),
     $action === 'facturar'          && $method === 'POST' => facturar($sesion),
     $action === 'facturar_multiple' && $method === 'POST' => facturarMultiple($sesion),
+    $action === 'facturar_movimientos' && $method === 'POST' => facturarMovimientos($sesion),
     $action === 'facturar_directo' && $method === 'POST' => facturarDirecto($sesion),
     $action === 'anular'           && $method === 'POST' => anular($sesion),
     $action === 'registrar_pago'   && $method === 'POST' => registrarPago($sesion),
@@ -106,6 +107,22 @@ function facturarMultiple(array $sesion): void {
     }
     try {
         $res = FacturacionService::facturarMultiples($cotizacion_ids, $d, $sesion['usuario_id']);
+        responder(201, $res);
+    } catch (Exception $e) {
+        responder(400, ['error' => $e->getMessage()]);
+    }
+}
+
+function facturarMovimientos(array $sesion): void {
+    requirePermiso($sesion['rol_id'], 'facturacion', 'puede_crear');
+    requirePermiso($sesion['rol_id'], 'movimientos', 'puede_editar');
+    $d = json_decode(file_get_contents('php://input'), true) ?? [];
+    $movimiento_ids = $d['movimiento_ids'] ?? [];
+    if (empty($movimiento_ids)) {
+        responder(400, ['error' => 'Selecciona al menos un movimiento.']); return;
+    }
+    try {
+        $res = FacturacionService::facturarMovimientos($movimiento_ids, $d, $sesion['usuario_id']);
         responder(201, $res);
     } catch (Exception $e) {
         responder(400, ['error' => $e->getMessage()]);
