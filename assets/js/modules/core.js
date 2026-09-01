@@ -80,6 +80,8 @@ function toggleSidebar() {
 }
 
 document.getElementById('btnMenuToggle').addEventListener('click', toggleSidebar);
+document.getElementById('btnMenuToggleTop')?.addEventListener('click', toggleSidebar);
+document.getElementById('overlay')?.addEventListener('click', () => document.body.classList.add('sb-mini'));
 
 // En mobile arranca colapsado
 if (isMobile()) document.body.classList.add('sb-mini');

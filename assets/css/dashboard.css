@@ -137,8 +137,19 @@
     .confirm-btns { display:flex; gap:8px; justify-content:center; }
     .confirm-btns .btn { flex:1; }
 
+    /* ── Botón hamburguesa en topbar (solo móvil) ─────────── */
+    .topbar-menu-btn {
+      display:none; flex-shrink:0; align-items:center; justify-content:center;
+      width:34px; height:34px; background:none; border:none; cursor:pointer;
+      border-radius:7px; padding:0; transition:background .15s;
+    }
+    .topbar-menu-btn:hover { background:rgba(255,255,255,.1); }
+    .topbar-menu-btn .hbr span { background:var(--muted); }
+    .topbar-menu-btn:hover .hbr span { background:var(--text); }
+
     /* RESPONSIVE */
     @media(max-width:768px) {
+      .topbar-menu-btn { display:flex; }
       #sidebar { width:0 !important; }
       body:not(.sb-mini) #sidebar { width:var(--sb-w) !important; }
       body:not(.sb-mini) #main    { margin-left:0 !important; }

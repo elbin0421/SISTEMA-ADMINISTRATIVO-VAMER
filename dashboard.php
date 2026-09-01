@@ -129,6 +129,9 @@ $sesion = requireAuth();
 <div id="main">
   <div class="topbar">
     <div class="topbar-left">
+      <button id="btnMenuToggleTop" class="topbar-menu-btn" title="Menú">
+        <div class="hbr"><span></span><span></span><span></span></div>
+      </button>
       <h3 id="topbarTitle">Inicio</h3>
     </div>
     <span class="clock" id="clock"></span>
