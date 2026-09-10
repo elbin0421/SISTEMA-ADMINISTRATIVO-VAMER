@@ -138,13 +138,31 @@
 
     <!-- Lista de movimientos pendientes del cliente -->
     <div id="multiMovListaWrap" style="display:none">
-      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">
-        Selecciona los movimientos a incluir en la factura:
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-size:12px;color:var(--muted)">Selecciona los movimientos a incluir en la factura:</span>
+        <select id="multiMovFiltroTipo" onchange="filtrarTipoMultiMov(this.value)"
+          style="padding:5px 8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px">
+          <option value="todos">Todos los tipos</option>
+          <option value="MAERSK">MAERSK</option>
+          <option value="ALPLA">ALPLA</option>
+        </select>
       </div>
       <div id="multiMovLista" style="max-height:260px;overflow-y:auto"></div>
-      <div style="margin-top:10px;padding:10px 12px;background:var(--bg);border-radius:8px;font-size:13px;display:flex;justify-content:space-between">
-        <span>Movimientos seleccionados: <strong id="multiMovCount">0</strong></span>
-        <span>Total: <strong id="multiMovTotal" style="color:var(--accent)">L. 0.00</strong></span>
+
+      <div style="margin-top:10px;padding:10px 12px;background:var(--bg);border-radius:8px;font-size:13px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+          <span>Movimientos seleccionados: <strong id="multiMovCount">0</strong></span>
+          <span>Subtotal: <strong id="multiMovSubtotal">L. 0.00</strong></span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <label style="font-size:12px;color:var(--muted)">⛽ Combustible a rebajar (L.)</label>
+          <input type="number" id="multiMovCombustible" min="0" step="0.01" value="0" oninput="actualizarResumenMultiMov()"
+            style="width:110px;padding:5px 8px;background:var(--sidebar);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;text-align:right">
+        </div>
+        <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:6px">
+          <span>Total a facturar:</span>
+          <strong id="multiMovTotal" style="color:var(--accent)">L. 0.00</strong>
+        </div>
       </div>
     </div>
     <div id="multiMovSinMovs" style="display:none;color:var(--muted);font-size:13px;padding:16px 0;text-align:center">
@@ -165,6 +183,10 @@
         </div>
       </div>
       <div id="multiMovNotaMetodo" style="display:none;font-size:12px;color:var(--muted);margin-bottom:8px"></div>
+      <div class="form-group">
+        <label>Descripción para la factura</label>
+        <input type="text" id="multiMovDescripcionFactura" placeholder="Ej. Servicio de transporte de contenedores — Quincena Agosto (dejar vacío para detallar cada movimiento)">
+      </div>
       <div class="form-group"><label>Observaciones</label>
         <input type="text" id="multiMovObs" placeholder="Opcional...">
       </div>

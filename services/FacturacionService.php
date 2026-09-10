@@ -221,21 +221,45 @@ class FacturacionService {
             $movimientos[] = $mov;
         }
 
-        // Armar los ítems de la factura a partir de cada movimiento
+        // Armar los ítems de la factura a partir de cada movimiento,
+        // o un único ítem con descripción personalizada si se indicó.
+        $descripcionFactura = trim($opciones['descripcion_factura'] ?? '');
         $items = [];
-        foreach ($movimientos as $mov) {
-            $partes = array_filter([
-                $mov['tipo'],
-                $mov['flete']      ?: null,
-                $mov['destino']    ? 'Destino: ' . $mov['destino']       : null,
-                $mov['contenedor'] ? 'Contenedor: ' . $mov['contenedor'] : null,
-            ]);
+        if ($descripcionFactura !== '') {
+            $totalTarifas = array_sum(array_map(fn($m) => (float)$m['tarifa'], $movimientos));
             $items[] = [
                 'tipo'            => 'movimiento',
-                'descripcion'     => implode(' · ', $partes),
+                'descripcion'     => $descripcionFactura,
                 'cantidad'        => 1,
-                'precio_unitario' => (float)$mov['tarifa'],
+                'precio_unitario' => $totalTarifas,
             ];
+        } else {
+            foreach ($movimientos as $mov) {
+                $partes = array_filter([
+                    $mov['tipo'],
+                    $mov['flete']      ?: null,
+                    $mov['destino']    ? 'Destino: ' . $mov['destino']       : null,
+                    $mov['contenedor'] ? 'Contenedor: ' . $mov['contenedor'] : null,
+                ]);
+                $items[] = [
+                    'tipo'            => 'movimiento',
+                    'descripcion'     => implode(' · ', $partes),
+                    'cantidad'        => 1,
+                    'precio_unitario' => (float)$mov['tarifa'],
+                ];
+            }
+        }
+
+        // Combustible cobrado directamente por el cliente: se resta del monto a facturar
+        // (no se muestra como "Descuento" en la factura, solo queda anotado en Observaciones).
+        $combustible = round((float)($opciones['combustible'] ?? 0), 2);
+        if ($combustible > 0) {
+            $ultimo = count($items) - 1;
+            $items[$ultimo]['precio_unitario'] = max(0, round($items[$ultimo]['precio_unitario'] - $combustible, 2));
+
+            $notaCombustible = 'Se dedujo L. ' . number_format($combustible, 2) . ' por combustible cobrado directamente por el cliente.';
+            $obsExistente = trim($opciones['observaciones'] ?? '');
+            $opciones['observaciones'] = $obsExistente !== '' ? $obsExistente . ' | ' . $notaCombustible : $notaCombustible;
         }
 
         $opciones['cliente_id'] = $cliente_id;

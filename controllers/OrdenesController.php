@@ -56,35 +56,39 @@ function crear(array $sesion): void {
     if (!$clienteId || !$desc) {
         responder(400, ['error' => 'Cliente y descripcion son requeridos.']); return;
     }
-    $pdo = getDB();
-    $pdo->prepare("
-        INSERT INTO ordenes_trabajo
-          (numero_orden, fecha_apertura, cliente_id, usuario_id,
-           placa, marca, modelo, anio, color, kilometraje,
-           numero_motor, numero_chasis, descripcion_trabajo, estado, observaciones)
-        VALUES ('TEMP',?,?,?,?,?,?,?,?,?,?,?,?,'borrador',?)
-    ")->execute([
-        $d['fecha_apertura']     ?? date('Y-m-d'),
-        $clienteId,
-        $sesion['usuario_id'],
-        trim($d['placa']         ?? ''),
-        trim($d['marca']         ?? ''),
-        trim($d['modelo']        ?? ''),
-        ($d['anio']              ?? null) ?: null,
-        trim($d['color']         ?? ''),
-        ($d['kilometraje']       ?? null) ?: null,
-        trim($d['numero_motor']  ?? ''),
-        trim($d['numero_chasis'] ?? ''),
-        $desc,
-        trim($d['observaciones'] ?? ''),
-    ]);
-    $newId   = (int)$pdo->lastInsertId();
-    $tecnicos = $d['tecnicos'] ?? [];
-    if (!empty($tecnicos)) {
-        $st = $pdo->prepare("INSERT IGNORE INTO orden_tecnicos (orden_id, empleado_id) VALUES (?,?)");
-        foreach ($tecnicos as $empId) { $st->execute([$newId, (int)$empId]); }
+    try {
+        $pdo = getDB();
+        $pdo->prepare("
+            INSERT INTO ordenes_trabajo
+              (numero_orden, fecha_apertura, cliente_id, usuario_id,
+               placa, marca, modelo, anio, color, kilometraje,
+               numero_motor, numero_chasis, descripcion_trabajo, estado, observaciones)
+            VALUES ('TEMP',?,?,?,?,?,?,?,?,?,?,?,?,'borrador',?)
+        ")->execute([
+            $d['fecha_apertura']     ?? date('Y-m-d'),
+            $clienteId,
+            $sesion['usuario_id'],
+            trim($d['placa']         ?? ''),
+            trim($d['marca']         ?? ''),
+            trim($d['modelo']        ?? ''),
+            ($d['anio']              ?? null) ?: null,
+            trim($d['color']         ?? ''),
+            ($d['kilometraje']       ?? null) ?: null,
+            trim($d['numero_motor']  ?? ''),
+            trim($d['numero_chasis'] ?? ''),
+            $desc,
+            trim($d['observaciones'] ?? ''),
+        ]);
+        $newId    = (int)$pdo->lastInsertId();
+        $tecnicos = $d['tecnicos'] ?? [];
+        if (!empty($tecnicos)) {
+            $st = $pdo->prepare("INSERT IGNORE INTO orden_tecnicos (orden_id, empleado_id) VALUES (?,?)");
+            foreach ($tecnicos as $empId) { $st->execute([$newId, (int)$empId]); }
+        }
+        responder(201, ['ok' => true, 'id' => $newId]);
+    } catch (Exception $e) {
+        responder(500, ['error' => 'No se pudo crear la OT: ' . $e->getMessage()]);
     }
-    responder(201, ['ok' => true, 'id' => $newId]);
 }
 
 function editar(array $sesion): void {
@@ -97,36 +101,40 @@ function editar(array $sesion): void {
     if (in_array($ot['estado'], ['facturada', 'anulada'])) {
         responder(400, ['error' => 'No se puede editar una OT facturada o anulada.']); return;
     }
-    $pdo = getDB();
-    $pdo->prepare("
-        UPDATE ordenes_trabajo SET
-          cliente_id=?, fecha_apertura=?,
-          placa=?, marca=?, modelo=?, anio=?, color=?, kilometraje=?,
-          numero_motor=?, numero_chasis=?, descripcion_trabajo=?, observaciones=?
-        WHERE id_orden=?
-    ")->execute([
-        (int)($d['cliente_id']       ?? 0),
-        $d['fecha_apertura']         ?? date('Y-m-d'),
-        trim($d['placa']             ?? ''),
-        trim($d['marca']             ?? ''),
-        trim($d['modelo']            ?? ''),
-        ($d['anio']                  ?? null) ?: null,
-        trim($d['color']             ?? ''),
-        ($d['kilometraje']           ?? null) ?: null,
-        trim($d['numero_motor']      ?? ''),
-        trim($d['numero_chasis']     ?? ''),
-        trim($d['descripcion_trabajo'] ?? ''),
-        trim($d['observaciones']     ?? ''),
-        $id,
-    ]);
-    // Técnicos: borrar y reinsertar
-    $pdo->prepare("DELETE FROM orden_tecnicos WHERE orden_id=?")->execute([$id]);
-    $tecnicos = $d['tecnicos'] ?? [];
-    if (!empty($tecnicos)) {
-        $st = $pdo->prepare("INSERT IGNORE INTO orden_tecnicos (orden_id, empleado_id) VALUES (?,?)");
-        foreach ($tecnicos as $empId) { $st->execute([$id, (int)$empId]); }
+    try {
+        $pdo = getDB();
+        $pdo->prepare("
+            UPDATE ordenes_trabajo SET
+              cliente_id=?, fecha_apertura=?,
+              placa=?, marca=?, modelo=?, anio=?, color=?, kilometraje=?,
+              numero_motor=?, numero_chasis=?, descripcion_trabajo=?, observaciones=?
+            WHERE id_orden=?
+        ")->execute([
+            (int)($d['cliente_id']       ?? 0),
+            $d['fecha_apertura']         ?? date('Y-m-d'),
+            trim($d['placa']             ?? ''),
+            trim($d['marca']             ?? ''),
+            trim($d['modelo']            ?? ''),
+            ($d['anio']                  ?? null) ?: null,
+            trim($d['color']             ?? ''),
+            ($d['kilometraje']           ?? null) ?: null,
+            trim($d['numero_motor']      ?? ''),
+            trim($d['numero_chasis']     ?? ''),
+            trim($d['descripcion_trabajo'] ?? ''),
+            trim($d['observaciones']     ?? ''),
+            $id,
+        ]);
+        // Técnicos: borrar y reinsertar
+        $pdo->prepare("DELETE FROM orden_tecnicos WHERE orden_id=?")->execute([$id]);
+        $tecnicos = $d['tecnicos'] ?? [];
+        if (!empty($tecnicos)) {
+            $st = $pdo->prepare("INSERT IGNORE INTO orden_tecnicos (orden_id, empleado_id) VALUES (?,?)");
+            foreach ($tecnicos as $empId) { $st->execute([$id, (int)$empId]); }
+        }
+        responder(200, ['ok' => true]);
+    } catch (Exception $e) {
+        responder(500, ['error' => 'No se pudo actualizar la OT: ' . $e->getMessage()]);
     }
-    responder(200, ['ok' => true]);
 }
 
 function cambiarEstado(array $sesion): void {

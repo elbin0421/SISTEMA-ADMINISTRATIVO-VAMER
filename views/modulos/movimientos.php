@@ -3,6 +3,14 @@
     <div class="card-header">
       <h4>🚛 Movimientos — MAERSK / ALPLA</h4>
       <div class="btn-group">
+        <div class="mov-stat-card" style="border-color:#3ea8e0">
+          <span class="mov-stat-label">💰 Facturado</span>
+          <span class="mov-stat-val" id="movStatFacturado" style="color:#3ea8e0">L. 0.00</span>
+        </div>
+        <div class="mov-stat-card" style="border-color:#e0a83e">
+          <span class="mov-stat-label">⏳ Pendiente</span>
+          <span class="mov-stat-val" id="movStatPendiente" style="color:#e0a83e">L. 0.00</span>
+        </div>
         <button class="btn btn-secondary" onclick="abrirModalFacturarMovimientos()">📑 Facturar Movimientos</button>
         <button class="btn btn-secondary" onclick="exportarMovimientosListadoExcel()">⬇️ Descargar Excel</button>
         <button class="btn btn-primary" onclick="abrirModalMovimiento()">+ Registrar Movimiento</button>

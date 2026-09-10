@@ -247,7 +247,7 @@ async function guardarOT() {
     observaciones: document.getElementById('otObs').value.trim() };
   const r = await api('controllers/OrdenesController.php?action='+(id?'editar':'crear'), { method:'POST', body:JSON.stringify(body) });
   if (r.ok) { cerrarModal('modalOT'); toast(id?'OT actualizada.':'OT creada correctamente.','success'); cargarOrdenes(); }
-  else { errEl.textContent=r.data.error||'Error.'; errEl.style.display='block'; }
+  else { errEl.textContent=r.data?.error||'Error al guardar la OT.'; errEl.style.display='block'; }
 }
 
 async function verDetalleOT(id) {

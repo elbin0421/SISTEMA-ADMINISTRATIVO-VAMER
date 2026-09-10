@@ -27,6 +27,30 @@ async function cargarMovimientos() {
   movimientosDataFull = datos;
   paginaActual['movimientos'] = 1;
   renderTablaMovimientos(datos);
+  actualizarTarjetasResumenMov(tipo, estado, q, fechaDesde, fechaHasta, periodo, datos);
+}
+
+async function actualizarTarjetasResumenMov(tipo, estadoFiltro, q, fechaDesde, fechaHasta, periodo, datosYaCargados) {
+  // Suma facturado/pendiente respetando tipo/fecha/periodo/búsqueda, sin importar
+  // el filtro de estado seleccionado en pantalla (para que ambas tarjetas sean siempre útiles).
+  let datos;
+  if (estadoFiltro === 'todos') {
+    datos = datosYaCargados; // ya viene sin filtrar por estado, reutilizamos
+  } else {
+    const params = new URLSearchParams({ action: 'listar', tipo, estado: 'todos', q });
+    if (fechaDesde) params.set('fecha_desde', fechaDesde);
+    if (fechaHasta) params.set('fecha_hasta', fechaHasta);
+    const r = await api('controllers/MovimientosController.php?' + params.toString());
+    if (!r.ok) return;
+    datos = r.data.data || [];
+    if (periodo) datos = datos.filter(m => (m.periodo || '').toLowerCase().includes(periodo));
+  }
+
+  const sumar = (est) => datos.reduce((a, m) => a + (m.estado === est ? parseFloat(m.tarifa || 0) : 0), 0);
+  const elFact = document.getElementById('movStatFacturado');
+  const elPend = document.getElementById('movStatPendiente');
+  if (elFact) elFact.textContent = fmtMoneda(sumar('facturado'));
+  if (elPend) elPend.textContent = fmtMoneda(sumar('pendiente'));
 }
 
 function limpiarFiltrosMovimientos() {
@@ -407,13 +431,18 @@ async function anularMovimiento(id) {
 let multiMovMetodoSelec  = '';
 let multiMovsSeleccionadas = new Set();
 let multiMovsDisponibles   = [];
+let multiMovTipoFiltro     = 'todos';
 
 function abrirModalFacturarMovimientos() {
   multiMovMetodoSelec = '';
+  multiMovTipoFiltro = 'todos';
   multiMovsSeleccionadas.clear();
   multiMovsDisponibles = [];
   document.getElementById('multiMovClienteBuscar').value = '';
   document.getElementById('multiMovClienteId').value = '';
+  document.getElementById('multiMovFiltroTipo').value = 'todos';
+  document.getElementById('multiMovCombustible').value = '0';
+  document.getElementById('multiMovDescripcionFactura').value = '';
   document.getElementById('multiMovListaWrap').style.display  = 'none';
   document.getElementById('multiMovSinMovs').style.display    = 'none';
   document.getElementById('multiMovMetodoWrap').style.display = 'none';
@@ -454,9 +483,8 @@ async function cargarMovimientosPendientesMulti(cliente_id) {
   if (!r.ok) { toast('Error cargando movimientos pendientes.', 'error'); return; }
   multiMovsDisponibles = r.data.data || [];
 
-  const listaEl   = document.getElementById('multiMovLista');
-  const wrapEl    = document.getElementById('multiMovListaWrap');
   const sinMovsEl = document.getElementById('multiMovSinMovs');
+  const wrapEl    = document.getElementById('multiMovListaWrap');
 
   if (!multiMovsDisponibles.length) {
     wrapEl.style.display    = 'none';
@@ -467,20 +495,41 @@ async function cargarMovimientosPendientesMulti(cliente_id) {
   }
   sinMovsEl.style.display = 'none';
   wrapEl.style.display    = 'block';
+  renderListaMultiMov();
+}
 
-  listaEl.innerHTML = multiMovsDisponibles.map(m => `
-    <div class="cot-check-item" id="mov-item-${m.id_movimiento}" onclick="toggleMovMulti(${m.id_movimiento})">
-      <input type="checkbox" id="chkMov-${m.id_movimiento}" onclick="event.stopPropagation();"
-        onchange="toggleMovMulti(${m.id_movimiento})">
-      <div style="flex:1">
-        <div style="font-weight:600">${m.tipo} ${m.ot ? '· OT: ' + m.ot : ''}</div>
-        <div style="font-size:11px;color:var(--muted)">
-          ${m.fecha} ${m.contenedor ? '· Cont: '+m.contenedor : ''} ${m.chasis ? '· Chasis: '+m.chasis : ''} ${m.placa ? '· Placa: '+m.placa : ''}
+function filtrarTipoMultiMov(tipo) {
+  multiMovTipoFiltro = tipo;
+  renderListaMultiMov();
+}
+
+function renderListaMultiMov() {
+  const listaEl = document.getElementById('multiMovLista');
+  const visibles = multiMovTipoFiltro === 'todos'
+    ? multiMovsDisponibles
+    : multiMovsDisponibles.filter(m => m.tipo === multiMovTipoFiltro);
+
+  if (!visibles.length) {
+    listaEl.innerHTML = '<p style="color:var(--muted);font-size:13px;text-align:center;padding:16px 0">Sin movimientos de este tipo.</p>';
+  } else {
+    listaEl.innerHTML = visibles.map(m => `
+      <div class="cot-check-item" id="mov-item-${m.id_movimiento}" onclick="toggleMovMulti(${m.id_movimiento})">
+        <input type="checkbox" id="chkMov-${m.id_movimiento}" onclick="event.stopPropagation();"
+          onchange="toggleMovMulti(${m.id_movimiento})" ${multiMovsSeleccionadas.has(m.id_movimiento) ? 'checked' : ''}>
+        <div style="flex:1">
+          <div style="font-weight:600">${m.tipo} ${m.ot ? '· OT: ' + m.ot : ''}</div>
+          <div style="font-size:11px;color:var(--muted)">
+            ${m.fecha} ${m.contenedor ? '· Cont: '+m.contenedor : ''} ${m.chasis ? '· Chasis: '+m.chasis : ''} ${m.placa ? '· Placa: '+m.placa : ''}
+          </div>
         </div>
-      </div>
-      <div style="font-weight:600;color:var(--accent)">${fmtMoneda(m.tarifa)}</div>
-    </div>`).join('');
-
+        <div style="font-weight:600;color:var(--accent)">${fmtMoneda(m.tarifa)}</div>
+      </div>`).join('');
+    visibles.forEach(m => {
+      if (multiMovsSeleccionadas.has(m.id_movimiento)) {
+        document.getElementById('mov-item-' + m.id_movimiento)?.classList.add('selected');
+      }
+    });
+  }
   actualizarResumenMultiMov();
 }
 
@@ -501,11 +550,14 @@ function toggleMovMulti(id) {
 
 function actualizarResumenMultiMov() {
   const count = multiMovsSeleccionadas.size;
-  const total = multiMovsDisponibles
+  const subtotal = multiMovsDisponibles
     .filter(m => multiMovsSeleccionadas.has(m.id_movimiento))
     .reduce((s, m) => s + parseFloat(m.tarifa || 0), 0);
+  const combustible = parseFloat(document.getElementById('multiMovCombustible')?.value) || 0;
+  const total = Math.max(0, subtotal - combustible);
 
   document.getElementById('multiMovCount').textContent = count;
+  document.getElementById('multiMovSubtotal').textContent = fmtMoneda(subtotal);
   document.getElementById('multiMovTotal').textContent = fmtMoneda(total);
 
   const metodoWrap = document.getElementById('multiMovMetodoWrap');
@@ -556,9 +608,11 @@ async function confirmarFacturarMovimientos() {
   const totalMovs = ids.length;
 
   const body = {
-    movimiento_ids: ids,
-    metodo_pago:    multiMovMetodoSelec,
-    observaciones:  (document.getElementById('multiMovObs').value || '').trim() || null,
+    movimiento_ids:       ids,
+    metodo_pago:          multiMovMetodoSelec,
+    observaciones:        (document.getElementById('multiMovObs').value || '').trim() || null,
+    combustible:          parseFloat(document.getElementById('multiMovCombustible').value) || 0,
+    descripcion_factura:  (document.getElementById('multiMovDescripcionFactura').value || '').trim() || null,
   };
 
   const btn = document.getElementById('btnConfirmarMultiMov');

@@ -1,6 +1,40 @@
 <?php
 require_once __DIR__ . '/config/auth.php';
 $sesion = requireAuth();
+
+// Permisos de visibilidad del menú lateral (rol_id -> módulo -> puede_ver)
+$stmtPerm = getDB()->prepare("SELECT modulo, puede_ver FROM permisos WHERE rol_id = ?");
+$stmtPerm->execute([$sesion['rol_id']]);
+$permisosVer = [];
+foreach ($stmtPerm->fetchAll() as $p) { $permisosVer[$p['modulo']] = (bool)$p['puede_ver']; }
+
+// Mapa: data-module del menú -> nombre real del módulo en la tabla `permisos`.
+// Los módulos que NO aparecen aquí no tienen permiso definido en el sistema
+// todavía, así que se muestran siempre (no hay nada que restringir).
+$moduloPermiso = [
+    'usuarios'      => 'usuarios',
+    'roles'         => 'roles',
+    'clientes'      => 'clientes',
+    'inventario'    => 'inventario',
+    'compras'       => 'compras',
+    'ordenes'       => 'ordenes_trabajo',
+    'cotizaciones'  => 'cotizaciones',
+    'movimientos'   => 'movimientos',
+    'facturacion'   => 'facturacion',
+    'pagos'         => 'pagos',
+    'gastos'        => 'gastos',
+    'planillas'     => 'planillas',
+    'reportes'      => 'reportes',
+];
+
+// true si el módulo debe mostrarse: sin permiso definido = visible por defecto;
+// con permiso definido = solo si puede_ver está activo.
+function puedeVerModulo(string $dataModule) {
+    global $moduloPermiso, $permisosVer;
+    if (!isset($moduloPermiso[$dataModule])) return true;
+    $mod = $moduloPermiso[$dataModule];
+    return $permisosVer[$mod] ?? false;
+}
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -37,6 +71,7 @@ $sesion = requireAuth();
     </a>
 
     <!-- ── 1. ADMINISTRACIÓN ── -->
+    <?php if (puedeVerModulo('usuarios') || puedeVerModulo('roles')): ?>
     <div class="nav-group" id="grp-admin">
       <div class="nav-group-header" onclick="toggleGrupo('admin')" title="Administración">
         <span class="nav-icon">⚙️</span>
@@ -44,12 +79,14 @@ $sesion = requireAuth();
         <svg class="nav-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
       <div class="nav-group-body">
-        <a class="nav-item" data-module="usuarios" title="Usuarios"><span class="nav-icon">👥</span><span class="nav-text">Usuarios</span></a>
-        <a class="nav-item" data-module="roles" title="Roles y Permisos"><span class="nav-icon">🔑</span><span class="nav-text">Roles y Permisos</span></a>
+        <?php if (puedeVerModulo('usuarios')): ?><a class="nav-item" data-module="usuarios" title="Usuarios"><span class="nav-icon">👥</span><span class="nav-text">Usuarios</span></a><?php endif; ?>
+        <?php if (puedeVerModulo('roles')): ?><a class="nav-item" data-module="roles" title="Roles y Permisos"><span class="nav-icon">🔑</span><span class="nav-text">Roles y Permisos</span></a><?php endif; ?>
       </div>
     </div>
+    <?php endif; ?>
 
     <!-- ── 2. OPERACIONES ── -->
+    <?php if (puedeVerModulo('clientes') || puedeVerModulo('vehiculos') || puedeVerModulo('inventario') || puedeVerModulo('requisiciones') || puedeVerModulo('compras') || puedeVerModulo('proveedores') || puedeVerModulo('ordenes')): ?>
     <div class="nav-group" id="grp-operaciones">
       <div class="nav-group-header" onclick="toggleGrupo('operaciones')" title="Operaciones">
         <span class="nav-icon">🔧</span>
@@ -57,17 +94,19 @@ $sesion = requireAuth();
         <svg class="nav-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
       <div class="nav-group-body">
-        <a class="nav-item" data-module="clientes"    title="Clientes"><span class="nav-icon">🧾</span><span class="nav-text">Clientes</span></a>
-        <a class="nav-item" data-module="vehiculos"   title="Vehículos"><span class="nav-icon">🚗</span><span class="nav-text">Vehículos</span></a>
-        <a class="nav-item" data-module="inventario"    title="Inventario"><span class="nav-icon">📦</span><span class="nav-text">Inventario</span></a>
-        <a class="nav-item" data-module="requisiciones" title="Requisiciones de Materiales"><span class="nav-icon">📋</span><span class="nav-text">Requisiciones</span></a>
-        <a class="nav-item" data-module="compras"     title="Compras"><span class="nav-icon">🛒</span><span class="nav-text">Compras</span></a>
-        <a class="nav-item" data-module="proveedores" title="Proveedores"><span class="nav-icon">🏭</span><span class="nav-text">Proveedores</span></a>
-        <a class="nav-item" data-module="ordenes"     title="Órdenes de Trabajo"><span class="nav-icon">🔩</span><span class="nav-text">Órdenes de Trabajo</span></a>
+        <?php if (puedeVerModulo('clientes')): ?><a class="nav-item" data-module="clientes"    title="Clientes"><span class="nav-icon">🧾</span><span class="nav-text">Clientes</span></a><?php endif; ?>
+        <?php if (puedeVerModulo('vehiculos')): ?><a class="nav-item" data-module="vehiculos"   title="Vehículos"><span class="nav-icon">🚗</span><span class="nav-text">Vehículos</span></a><?php endif; ?>
+        <?php if (puedeVerModulo('inventario')): ?><a class="nav-item" data-module="inventario"    title="Inventario"><span class="nav-icon">📦</span><span class="nav-text">Inventario</span></a><?php endif; ?>
+        <?php if (puedeVerModulo('requisiciones')): ?><a class="nav-item" data-module="requisiciones" title="Requisiciones de Materiales"><span class="nav-icon">📋</span><span class="nav-text">Requisiciones</span></a><?php endif; ?>
+        <?php if (puedeVerModulo('compras')): ?><a class="nav-item" data-module="compras"     title="Compras"><span class="nav-icon">🛒</span><span class="nav-text">Compras</span></a><?php endif; ?>
+        <?php if (puedeVerModulo('proveedores')): ?><a class="nav-item" data-module="proveedores" title="Proveedores"><span class="nav-icon">🏭</span><span class="nav-text">Proveedores</span></a><?php endif; ?>
+        <?php if (puedeVerModulo('ordenes')): ?><a class="nav-item" data-module="ordenes"     title="Órdenes de Trabajo"><span class="nav-icon">🔩</span><span class="nav-text">Órdenes de Trabajo</span></a><?php endif; ?>
       </div>
     </div>
+    <?php endif; ?>
 
     <!-- ── 3. COMERCIAL ── -->
+    <?php if (puedeVerModulo('cotizaciones') || puedeVerModulo('movimientos') || puedeVerModulo('catalogo') || puedeVerModulo('facturacion') || puedeVerModulo('cai') || puedeVerModulo('libro_ventas') || puedeVerModulo('pagos') || puedeVerModulo('gastos')): ?>
     <div class="nav-group" id="grp-comercial">
       <div class="nav-group-header" onclick="toggleGrupo('comercial')" title="Comercial">
         <span class="nav-icon">💰</span>
@@ -75,18 +114,20 @@ $sesion = requireAuth();
         <svg class="nav-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
       <div class="nav-group-body">
-        <a class="nav-item" data-module="cotizaciones"  title="Cotizaciones"><span class="nav-icon">📑</span><span class="nav-text">Cotizaciones</span></a>
-        <a class="nav-item" data-module="movimientos"   title="Movimientos"><span class="nav-icon">🚛</span><span class="nav-text">Movimientos</span></a>
-        <a class="nav-item" data-module="catalogo"      title="Catálogo de Precios"><span class="nav-icon">📂</span><span class="nav-text">Catálogo de Precios</span></a>
-        <a class="nav-item" data-module="facturacion"   title="Facturación"><span class="nav-icon">💳</span><span class="nav-text">Facturación</span></a>
-        <a class="nav-item" data-module="cai"           title="CAI"><span class="nav-icon">🏷️</span><span class="nav-text">CAI</span></a>
-        <a class="nav-item" data-module="libro_ventas"  title="Libro de Ventas"><span class="nav-icon">📒</span><span class="nav-text">Libro de Ventas</span></a>
-        <a class="nav-item" data-module="pagos"         title="Pagos"><span class="nav-icon">💵</span><span class="nav-text">Pagos</span></a>
-        <a class="nav-item" data-module="gastos"        title="Gastos DMC"><span class="nav-icon">🧾</span><span class="nav-text">Gastos DMC</span></a>
+        <?php if (puedeVerModulo('cotizaciones')): ?><a class="nav-item" data-module="cotizaciones"  title="Cotizaciones"><span class="nav-icon">📑</span><span class="nav-text">Cotizaciones</span></a><?php endif; ?>
+        <?php if (puedeVerModulo('movimientos')): ?><a class="nav-item" data-module="movimientos"   title="Movimientos"><span class="nav-icon">🚛</span><span class="nav-text">Movimientos</span></a><?php endif; ?>
+        <?php if (puedeVerModulo('catalogo')): ?><a class="nav-item" data-module="catalogo"      title="Catálogo de Precios"><span class="nav-icon">📂</span><span class="nav-text">Catálogo de Precios</span></a><?php endif; ?>
+        <?php if (puedeVerModulo('facturacion')): ?><a class="nav-item" data-module="facturacion"   title="Facturación"><span class="nav-icon">💳</span><span class="nav-text">Facturación</span></a><?php endif; ?>
+        <?php if (puedeVerModulo('cai')): ?><a class="nav-item" data-module="cai"           title="CAI"><span class="nav-icon">🏷️</span><span class="nav-text">CAI</span></a><?php endif; ?>
+        <?php if (puedeVerModulo('libro_ventas')): ?><a class="nav-item" data-module="libro_ventas"  title="Libro de Ventas"><span class="nav-icon">📒</span><span class="nav-text">Libro de Ventas</span></a><?php endif; ?>
+        <?php if (puedeVerModulo('pagos')): ?><a class="nav-item" data-module="pagos"         title="Pagos"><span class="nav-icon">💵</span><span class="nav-text">Pagos</span></a><?php endif; ?>
+        <?php if (puedeVerModulo('gastos')): ?><a class="nav-item" data-module="gastos"        title="Gastos DMC"><span class="nav-icon">🧾</span><span class="nav-text">Gastos DMC</span></a><?php endif; ?>
       </div>
     </div>
+    <?php endif; ?>
 
     <!-- ── 4. RRHH ── -->
+    <?php if (puedeVerModulo('planillas') || puedeVerModulo('vacaciones')): ?>
     <div class="nav-group" id="grp-rrhh">
       <div class="nav-group-header" onclick="toggleGrupo('rrhh')" title="RRHH">
         <span class="nav-icon">👷</span>
@@ -94,12 +135,14 @@ $sesion = requireAuth();
         <svg class="nav-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
       <div class="nav-group-body">
-        <a class="nav-item" data-module="planillas" title="Planilla"><span class="nav-icon">📋</span><span class="nav-text">Planilla</span></a>
-        <a class="nav-item" data-module="vacaciones" title="Vacaciones"><span class="nav-icon">🏖️</span><span class="nav-text">Vacaciones</span></a>
+        <?php if (puedeVerModulo('planillas')): ?><a class="nav-item" data-module="planillas" title="Planilla"><span class="nav-icon">📋</span><span class="nav-text">Planilla</span></a><?php endif; ?>
+        <?php if (puedeVerModulo('vacaciones')): ?><a class="nav-item" data-module="vacaciones" title="Vacaciones"><span class="nav-icon">🏖️</span><span class="nav-text">Vacaciones</span></a><?php endif; ?>
       </div>
     </div>
+    <?php endif; ?>
 
     <!-- ── 5. ANÁLISIS ── -->
+    <?php if (puedeVerModulo('reportes')): ?>
     <div class="nav-group" id="grp-analisis">
       <div class="nav-group-header" onclick="toggleGrupo('analisis')" title="Análisis">
         <span class="nav-icon">📊</span>
@@ -110,6 +153,7 @@ $sesion = requireAuth();
         <a class="nav-item" data-module="reportes" title="Reportes"><span class="nav-icon">📈</span><span class="nav-text">Reportes</span></a>
       </div>
     </div>
+    <?php endif; ?>
 
   </div><!-- /sidebar-nav -->
 

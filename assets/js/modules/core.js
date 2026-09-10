@@ -136,9 +136,25 @@ document.getElementById('btnLogout').addEventListener('click', async () => {
 // ── API ──────────────────────────────────────────────────────
 async function api(url, opts = {}) {
   opts.credentials = 'include';
-  opts.headers = { 'Content-Type':'application/json', ...(opts.headers||{}) };
-  const res = await fetch(url, opts);
-  const data = await res.json();
+  opts.headers = { 'Content-Type':'application/json', 'X-Requested-With':'XMLHttpRequest', ...(opts.headers||{}) };
+  let res;
+  try {
+    res = await fetch(url, opts);
+  } catch (e) {
+    return { ok:false, status:0, data:{ error:'No se pudo conectar con el servidor. Verifica tu conexión.' } };
+  }
+  let data;
+  try {
+    data = await res.json();
+  } catch (e) {
+    // El servidor respondió algo que no es JSON (p. ej. sesión vencida y redirigió a login,
+    // o un error fatal de PHP). Evita que la excepción quede silenciosa.
+    if (res.status === 401 || res.redirected) {
+      localStorage.clear();
+      window.location.href = 'login.html';
+    }
+    return { ok:false, status:res.status, data:{ error:'Respuesta inválida del servidor. Tu sesión pudo haber expirado; intenta recargar la página.' } };
+  }
   return { ok: res.ok, status: res.status, data };
 }
 
