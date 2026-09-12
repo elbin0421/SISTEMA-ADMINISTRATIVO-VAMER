@@ -9,16 +9,15 @@ require_once __DIR__ . '/../models/ProveedorModel.php';
 header('Content-Type: application/json');
 
 $sesion = requireAuth();
-requirePermiso($sesion['rol_id'], 'compras', 'puede_ver');
 
 $action = $_GET['action'] ?? 'listar';
 $method = $_SERVER['REQUEST_METHOD'];
 
 match(true) {
-    $action === 'listar'          && $method === 'GET'  => listar(),
-    $action === 'obtener'         && $method === 'GET'  => obtener(),
-    $action === 'proveedores'     && $method === 'GET'  => proveedores(),
-    $action === 'prov_obtener'    && $method === 'GET'  => provObtener(),
+    $action === 'listar'          && $method === 'GET'  => listar($sesion),
+    $action === 'obtener'         && $method === 'GET'  => obtener($sesion),
+    $action === 'proveedores'     && $method === 'GET'  => proveedores($sesion),
+    $action === 'prov_obtener'    && $method === 'GET'  => provObtener($sesion),
     $action === 'crear'           && $method === 'POST' => crear($sesion),
     $action === 'cambiar_estado'  && $method === 'POST' => cambiarEstado($sesion),
     $action === 'editar' && $method === 'POST' => editar($sesion),
@@ -28,23 +27,27 @@ match(true) {
     default => responder(400, ['error' => 'Accion no valida'])
 };
 
-function listar(): void {
+function listar(array $sesion): void {
+    requirePermiso($sesion['rol_id'], 'compras', 'puede_ver');
     responder(200, ['ok' => true, 'data' => CompraModel::listar()]);
 }
 
-function obtener(): void {
+function obtener(array $sesion): void {
+    requirePermiso($sesion['rol_id'], 'compras', 'puede_ver');
     $id     = (int)($_GET['id'] ?? 0);
     $compra = CompraModel::obtener($id);
     if (!$compra) { responder(404, ['error' => 'Compra no encontrada']); return; }
     responder(200, ['ok' => true, 'data' => $compra]);
 }
 
-function proveedores(): void {
+function proveedores(array $sesion): void {
+    requirePermiso($sesion['rol_id'], 'proveedores', 'puede_ver');
     $estado = $_GET['estado'] ?? 'activo';
     responder(200, ['ok' => true, 'data' => ProveedorModel::listar($estado)]);
 }
 
-function provObtener(): void {
+function provObtener(array $sesion): void {
+    requirePermiso($sesion['rol_id'], 'proveedores', 'puede_ver');
     $id  = (int)($_GET['id'] ?? 0);
     $row = ProveedorModel::obtener($id);
     if (!$row) { responder(404, ['error' => 'Proveedor no encontrado']); return; }
@@ -52,6 +55,7 @@ function provObtener(): void {
 }
 
 function editar(array $sesion): void {
+    requirePermiso($sesion['rol_id'], 'compras', 'puede_editar');
     $d=json_decode(file_get_contents('php://input'),true)??[];
     $id=(int)($d['id']??0);
     if(!$id){responder(400,['error'=>'id requerido']);return;}
@@ -87,7 +91,7 @@ function cambiarEstado(array $sesion): void {
 }
 
 function provCrear(array $sesion): void {
-    requirePermiso($sesion['rol_id'], 'compras', 'puede_crear');
+    requirePermiso($sesion['rol_id'], 'proveedores', 'puede_crear');
     $d      = json_decode(file_get_contents('php://input'), true) ?? [];
     $nombre = trim($d['nombre'] ?? '');
     if (!$nombre) { responder(400, ['error' => 'El nombre es requerido.']); return; }
@@ -96,7 +100,7 @@ function provCrear(array $sesion): void {
 }
 
 function provEditar(array $sesion): void {
-    requirePermiso($sesion['rol_id'], 'compras', 'puede_editar');
+    requirePermiso($sesion['rol_id'], 'proveedores', 'puede_editar');
     $d      = json_decode(file_get_contents('php://input'), true) ?? [];
     $id     = (int)($d['id'] ?? 0);
     $nombre = trim($d['nombre'] ?? '');
@@ -106,7 +110,7 @@ function provEditar(array $sesion): void {
 }
 
 function provEstado(array $sesion): void {
-    requirePermiso($sesion['rol_id'], 'compras', 'puede_editar');
+    requirePermiso($sesion['rol_id'], 'proveedores', 'puede_editar');
     $d      = json_decode(file_get_contents('php://input'), true) ?? [];
     $id     = (int)($d['id'] ?? 0);
     $estado = $d['estado'] ?? '';

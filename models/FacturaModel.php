@@ -506,8 +506,30 @@ class FacturaModel {
         $pdo  = getDB();
         $mes  = date('m');
         $anio = date('Y');
+        $stmt = $pdo->prepare("SELECT
+    COUNT(CASE WHEN estado != 'anulada' THEN 1 END) AS total_mes,
 
-        $stmt = $pdo->prepare("
+    COALESCE(
+        SUM(CASE WHEN estado != 'anulada' THEN total END),
+        0
+    ) AS monto_mes,
+
+    COUNT(CASE WHEN estado = 'anulada' THEN 1 END) AS anuladas_mes,
+
+    (
+        SELECT COUNT(*)
+        FROM facturas
+        WHERE estado = 'pendiente'
+    ) AS pendientes_cobro
+
+FROM facturas
+
+WHERE MONTH(fecha) = ?
+  AND YEAR(fecha) = ?");
+        $stmt->execute([$mes, $anio]);
+        return $stmt->fetch();
+
+         /**$stmt = $pdo->prepare("
             SELECT
                 COUNT(CASE WHEN estado != 'anulada' THEN 1 END)           AS total_mes,
                 COALESCE(SUM(CASE WHEN estado != 'anulada' THEN total END), 0) AS monto_mes,
@@ -518,5 +540,6 @@ class FacturaModel {
         ");
         $stmt->execute([$mes, $anio]);
         return $stmt->fetch();
+        */
     }
 }

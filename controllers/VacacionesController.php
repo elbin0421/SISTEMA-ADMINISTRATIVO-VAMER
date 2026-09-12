@@ -9,6 +9,7 @@ require_once __DIR__ . '/../config/auth.php';
 header('Content-Type: application/json');
 
 $sesion = requireAuth();
+requirePermiso($sesion['rol_id'], 'vacaciones', 'puede_ver');
 $action = $_GET['action'] ?? 'listar';
 $method = $_SERVER['REQUEST_METHOD'];
 

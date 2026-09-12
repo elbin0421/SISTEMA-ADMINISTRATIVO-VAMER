@@ -4,6 +4,7 @@ require_once __DIR__ . '/../config/auth.php';
 require_once __DIR__ . '/../models/RequisicionModel.php';
 
 $sesion = requireAuth();
+requirePermiso($sesion['rol_id'], 'requisiciones', 'puede_ver');
 $action = $_GET['action'] ?? '';
 $method = $_SERVER['REQUEST_METHOD'];
 

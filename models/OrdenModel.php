@@ -48,7 +48,8 @@ class OrdenModel {
             SELECT e.id_empleado, CONCAT(e.nombres, ' ', e.apellidos) AS nombre, e.puesto, e.salario_mensual
             FROM orden_tecnicos ott
             JOIN empleados e ON e.id_empleado = ott.empleado_id
-            WHERE ott.orden_id = ? ORDER BY e.apellidos, e.nombres
+            WHERE ott.orden_id = ? 
+            ORDER BY e.apellidos, e.nombres
         ");
         $s->execute([$id]);
         $ot['tecnicos'] = $s->fetchAll();

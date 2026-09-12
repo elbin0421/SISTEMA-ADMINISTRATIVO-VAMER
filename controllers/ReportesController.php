@@ -8,25 +8,25 @@ require_once __DIR__ . '/../models/PlanillaModel.php';
 require_once __DIR__ . '/../models/PagoModel.php';
 
 $sesion = requireAuth();
-requirePermiso($sesion['rol_id'], 'reportes', 'puede_ver');
 
 $action = $_GET['action'] ?? '';
 $format = $_GET['format'] ?? 'json';
 
 match(true) {
-    $action === 'ventas'                                    => reporteVentas($format),
-    $action === 'cxc'                                       => reporteCxC($format),
-    $action === 'retenciones'                               => reporteRetenciones($format),
-    $action === 'planilla_pdf'                              => planillaPDF(),
-    $action === 'planilla_excel'                            => planillaExcel(),
-    $action === 'boucher_pdf'                                => boucherPDF(),
-    $action === 'boucher_todos_pdf'                          => boucherTodosPDF(),
-    $action === 'inventario' || $action === 'inventario_mov'=> reporteInventario($format),
-    $action === 'rentabilidad'||$action==='rentabilidad_ot' => reporteRentabilidad($format),
+    $action === 'ventas'                                    => reporteVentas($sesion, $format),
+    $action === 'cxc'                                       => reporteCxC($sesion, $format),
+    $action === 'retenciones'                               => reporteRetenciones($sesion, $format),
+    $action === 'planilla_pdf'                              => planillaPDF($sesion),
+    $action === 'planilla_excel'                            => planillaExcel($sesion),
+    $action === 'boucher_pdf'                                => boucherPDF($sesion),
+    $action === 'boucher_todos_pdf'                          => boucherTodosPDF($sesion),
+    $action === 'inventario' || $action === 'inventario_mov'=> reporteInventario($sesion, $format),
+    $action === 'rentabilidad'||$action==='rentabilidad_ot' => reporteRentabilidad($sesion, $format),
     default => jsonResponder(400, ['error' => 'Accion no valida'])
 };
 
-function reporteVentas(string $format): void {
+function reporteVentas(array $sesion, string $format): void {
+    requirePermiso($sesion['rol_id'], 'reportes_ventas', 'puede_ver');
     $mes=$_GET['mes']??''; $anio=$_GET['anio']??date('Y');
     $pdo=getDB();
     $where="WHERE f.estado!='anulada' AND YEAR(f.fecha)=?"; $params=[(int)$anio];
@@ -38,13 +38,15 @@ function reporteVentas(string $format): void {
     else jsonResponder(200,['ok'=>true,'data'=>$rows,'totales'=>$tot]);
 }
 
-function reporteCxC(string $format): void {
+function reporteCxC(array $sesion, string $format): void {
+    requirePermiso($sesion['rol_id'], 'reportes_cxc', 'puede_ver');
     $rows=PagoModel::cuentasPorCobrar(); $total=array_sum(array_column($rows,'saldo_pendiente'));
     if($format==='excel') exportarExcel($rows,'cxc','Cuentas_por_Cobrar');
     else jsonResponder(200,['ok'=>true,'data'=>$rows,'total_pendiente'=>$total]);
 }
 
-function reporteRetenciones(string $format): void {
+function reporteRetenciones(array $sesion, string $format): void {
+    requirePermiso($sesion['rol_id'], 'reportes_retenciones', 'puede_ver');
     $mes=$_GET['mes']??''; $anio=$_GET['anio']??date('Y');
     $where="WHERE p.estado='aplicado' AND YEAR(p.fecha)=?"; $params=[(int)$anio];
     if($mes){$where.=" AND MONTH(p.fecha)=?";$params[]=(int)$mes;}
@@ -55,7 +57,8 @@ function reporteRetenciones(string $format): void {
     else jsonResponder(200,['ok'=>true,'data'=>$rows,'totales'=>$tot]);
 }
 
-function reporteInventario(string $format): void {
+function reporteInventario(array $sesion, string $format): void {
+    requirePermiso($sesion['rol_id'], 'reportes_inventario', 'puede_ver');
     $mes=$_GET['mes']??''; $anio=$_GET['anio']??date('Y');
     $where="WHERE YEAR(m.fecha)=?"; $params=[(int)$anio];
     if($mes){$where.=" AND MONTH(m.fecha)=?";$params[]=(int)$mes;}
@@ -73,7 +76,8 @@ function reporteInventario(string $format): void {
     else jsonResponder(200,['ok'=>true,'data'=>$rows]);
 }
 
-function reporteRentabilidad(string $format): void {
+function reporteRentabilidad(array $sesion, string $format): void {
+    requirePermiso($sesion['rol_id'], 'reportes_rentabilidad', 'puede_ver');
     $anio=(int)($_GET['anio']??date('Y'));
     $stmt=getDB()->prepare("SELECT ot.numero_orden,ot.fecha_apertura,ot.fecha_cierre,cl.nombre AS cliente,COALESCE(mat.costo,0) AS costo_materiales,COALESCE(mo.costo,0) AS costo_mano_obra,COALESCE(mat.costo,0)+COALESCE(mo.costo,0) AS costo_total,COALESCE(f.total,0) AS facturado,COALESCE(f.total,0)-COALESCE(mat.costo,0)-COALESCE(mo.costo,0) AS utilidad,ot.estado FROM ordenes_trabajo ot JOIN clientes cl ON cl.id_cliente=ot.cliente_id LEFT JOIN(SELECT orden_id,SUM(subtotal) AS costo FROM detalle_orden_materiales GROUP BY orden_id)mat ON mat.orden_id=ot.id_orden LEFT JOIN(SELECT orden_id,SUM(subtotal) AS costo FROM detalle_orden_mano_obra GROUP BY orden_id)mo ON mo.orden_id=ot.id_orden LEFT JOIN(SELECT orden_id,SUM(total) AS total FROM facturas WHERE estado!='anulada' GROUP BY orden_id)f ON f.orden_id=ot.id_orden WHERE YEAR(ot.fecha_apertura)=? ORDER BY utilidad DESC");
     $stmt->execute([$anio]); $rows=$stmt->fetchAll();
@@ -83,7 +87,8 @@ function reporteRentabilidad(string $format): void {
 }
 
 // ── PDF Planilla ──────────────────────────────────────────────
-function planillaPDF(): void {
+function planillaPDF(array $sesion): void {
+    requirePermiso($sesion['rol_id'], 'reportes', 'puede_ver');
     $id=(int)($_GET['id']??0);
     $p=PlanillaModel::obtener($id);
     if(!$p){http_response_code(404);echo'Planilla no encontrada';exit;}
@@ -139,7 +144,8 @@ function planillaPDF(): void {
 }
 
 // ── Boucher de Pago (individual) ────────────────────────────────
-function boucherPDF(): void {
+function boucherPDF(array $sesion): void {
+    requirePermiso($sesion['rol_id'], 'reportes', 'puede_ver');
     $id  = (int)($_GET['id'] ?? 0);       // id_planilla
     $emp = (int)($_GET['empleado_id'] ?? 0);
     $p   = PlanillaModel::obtener($id);
@@ -158,7 +164,8 @@ function boucherPDF(): void {
 }
 
 // ── Boucher de Pago (todos los empleados de la planilla) ────────
-function boucherTodosPDF(): void {
+function boucherTodosPDF(array $sesion): void {
+    requirePermiso($sesion['rol_id'], 'reportes', 'puede_ver');
     $id = (int)($_GET['id'] ?? 0);
     $p  = PlanillaModel::obtener($id);
     if (!$p) { http_response_code(404); echo 'Planilla no encontrada'; exit; }
@@ -286,7 +293,8 @@ function renderBoucherHTML(array $p, array $d): string {
 }
 
 
-function planillaExcel(): void {
+function planillaExcel(array $sesion): void {
+    requirePermiso($sesion['rol_id'], 'reportes', 'puede_ver');
     $id=(int)($_GET['id']??0);
     $p=PlanillaModel::obtener($id);
     if(!$p){http_response_code(404);echo'No encontrada';exit;}

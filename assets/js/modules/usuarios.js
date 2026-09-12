@@ -80,7 +80,7 @@ async function toggleUsuario(id,estado,label) {
 }
 
 // ROLES
-const MODULOS = ['usuarios','roles','clientes','ordenes_trabajo','cotizaciones','facturacion','inventario','compras','pagos','planillas','reportes'];
+const MODULOS = ['usuarios','roles','clientes','vehiculos','ordenes_trabajo','cotizaciones','facturacion','cai','libro_ventas','inventario','requisiciones','compras','proveedores','catalogo','movimientos','pagos','gastos','planillas','vacaciones','reportes','reportes_ventas','reportes_cxc','reportes_retenciones','reportes_rentabilidad','reportes_inventario'];
 async function cargarRoles() {
   await cargarRolesCache();
   let html='';

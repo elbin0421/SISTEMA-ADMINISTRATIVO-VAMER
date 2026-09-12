@@ -4,7 +4,7 @@
 // ══════════════════════════════════════════════════════════
 
 // ── REPORTES ──────────────────────────────────────────────
-let reporteActual = 'ventas';
+let reporteActual = window.__reporteInicial || 'ventas';
 let reporteData   = [];
 
 function switchReporte(tipo) {

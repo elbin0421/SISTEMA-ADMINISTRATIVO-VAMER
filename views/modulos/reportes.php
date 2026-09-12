@@ -4,14 +4,29 @@
       <h4>📊 Reportes</h4>
     </div>
 
+    <?php
+    $subReportes = [
+      'ventas'       => ['id' => 'rptabVentas',       'icono' => '📈', 'label' => 'Ventas'],
+      'cxc'          => ['id' => 'rptabCxC',           'icono' => '🕐', 'label' => 'Cuentas x Cobrar'],
+      'retenciones'  => ['id' => 'rptabRetenciones',   'icono' => '📋', 'label' => 'Retenciones'],
+      'rentabilidad' => ['id' => 'rptabRentabilidad',  'icono' => '💹', 'label' => 'Rentabilidad OT'],
+      'inventario'   => ['id' => 'rptabInventario',    'icono' => '📦', 'label' => 'Inventario'],
+    ];
+    $reportesVisibles = [];
+    foreach ($subReportes as $key => $info) {
+      if (tienePermiso($sesion['rol_id'], "reportes_$key", 'puede_ver')) $reportesVisibles[$key] = $info;
+    }
+    $primerReporte = array_key_first($reportesVisibles);
+    ?>
+
+    <?php if ($primerReporte): ?>
     <!-- Selector de reporte -->
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px">
-      <button class="tab-btn active" id="rptabVentas"       onclick="switchReporte('ventas')">📈 Ventas</button>
-      <button class="tab-btn"        id="rptabCxC"          onclick="switchReporte('cxc')">🕐 Cuentas x Cobrar</button>
-      <button class="tab-btn"        id="rptabRetenciones"  onclick="switchReporte('retenciones')">📋 Retenciones</button>
-      <button class="tab-btn"        id="rptabRentabilidad" onclick="switchReporte('rentabilidad')">💹 Rentabilidad OT</button>
-      <button class="tab-btn"        id="rptabInventario"   onclick="switchReporte('inventario')">📦 Inventario</button>
+      <?php foreach ($reportesVisibles as $key => $info): ?>
+        <button class="tab-btn<?= $key === $primerReporte ? ' active' : '' ?>" id="<?= $info['id'] ?>" onclick="switchReporte('<?= $key ?>')"><?= $info['icono'] ?> <?= htmlspecialchars($info['label']) ?></button>
+      <?php endforeach; ?>
     </div>
+    <script>window.__reporteInicial = <?= json_encode($primerReporte) ?>;</script>
 
     <!-- Filtros comunes -->
     <div id="filtrosReporte" style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
@@ -39,5 +54,8 @@
       <p style="color:var(--muted);text-align:center;padding:40px">Selecciona un reporte y haz clic en Consultar.</p>
     </div>
     <div id="paginaReporte"></div>
+    <?php else: ?>
+      <p style="color:var(--muted);text-align:center;padding:40px">No tienes permiso para ver ningún reporte. Solicita acceso a un administrador.</p>
+    <?php endif; ?>
   </div>
 </div>

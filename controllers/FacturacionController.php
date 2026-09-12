@@ -11,19 +11,18 @@ require_once __DIR__ . '/../services/FacturacionService.php';
 header('Content-Type: application/json');
 
 $sesion = requireAuth();
-requirePermiso($sesion['rol_id'], 'facturacion', 'puede_ver');
 
 $action = $_GET['action'] ?? 'listar';
 $method = $_SERVER['REQUEST_METHOD'];
 
 match(true) {
-    $action === 'listar'           && $method === 'GET'  => listar(),
-    $action === 'obtener'          && $method === 'GET'  => obtener(),
-    $action === 'saldo_pendiente'  && $method === 'GET'  => saldoPendiente(),
-    $action === 'libro_ventas'     && $method === 'GET'  => libroVentas(),
-    $action === 'kpis'             && $method === 'GET'  => kpis(),
-    $action === 'cai_listar'       && $method === 'GET'  => caiListar(),
-    $action === 'cai_activo'       && $method === 'GET'  => caiActivo(),
+    $action === 'listar'           && $method === 'GET'  => listar($sesion),
+    $action === 'obtener'          && $method === 'GET'  => obtener($sesion),
+    $action === 'saldo_pendiente'  && $method === 'GET'  => saldoPendiente($sesion),
+    $action === 'libro_ventas'     && $method === 'GET'  => libroVentas($sesion),
+    $action === 'kpis'             && $method === 'GET'  => kpis($sesion),
+    $action === 'cai_listar'       && $method === 'GET'  => caiListar($sesion),
+    $action === 'cai_activo'       && $method === 'GET'  => caiActivo($sesion),
     $action === 'facturar'          && $method === 'POST' => facturar($sesion),
     $action === 'facturar_multiple' && $method === 'POST' => facturarMultiple($sesion),
     $action === 'facturar_movimientos' && $method === 'POST' => facturarMovimientos($sesion),
@@ -35,7 +34,8 @@ match(true) {
     default => responder(400, ['error' => 'Acción no válida'])
 };
 
-function saldoPendiente(): void {
+function saldoPendiente(array $sesion): void {
+    requirePermiso($sesion['rol_id'], 'facturacion', 'puede_ver');
     $id      = (int)($_GET['id'] ?? 0);
     $factura = FacturaModel::obtener($id);
     if (!$factura) { responder(404, ['error' => 'Factura no encontrada']); return; }
@@ -44,40 +44,46 @@ function saldoPendiente(): void {
     responder(200, ['ok' => true, 'pendiente' => $pendiente, 'pagado' => $pagado, 'subtotal' => $factura['subtotal']]);
 }
 
-function listar(): void {
+function listar(array $sesion): void {
+    requirePermiso($sesion['rol_id'], 'facturacion', 'puede_ver');
     $estado = $_GET['estado'] ?? '';
     responder(200, ['ok' => true, 'data' => FacturaModel::listar($estado)]);
 }
 
-function obtener(): void {
+function obtener(array $sesion): void {
+    requirePermiso($sesion['rol_id'], 'facturacion', 'puede_ver');
     $id = (int)($_GET['id'] ?? 0);
     $f  = FacturaModel::obtener($id);
     if (!$f) { responder(404, ['error' => 'Factura no encontrada']); return; }
     responder(200, ['ok' => true, 'data' => $f]);
 }
 
-function libroVentas(): void {
+function libroVentas(array $sesion): void {
+    requirePermiso($sesion['rol_id'], 'libro_ventas', 'puede_ver');
     $mes  = $_GET['mes']  ?? date('m');
     $anio = $_GET['anio'] ?? date('Y');
     $data = FacturacionService::libroVentas($mes, $anio);
     responder(200, ['ok' => true, 'data' => $data]);
 }
 
-function kpis(): void {
+function kpis(array $sesion): void {
+    requirePermiso($sesion['rol_id'], 'facturacion', 'puede_ver');
     responder(200, ['ok' => true, 'data' => FacturaModel::kpis()]);
 }
 
-function caiListar(): void {
+function caiListar(array $sesion): void {
+    requirePermiso($sesion['rol_id'], 'cai', 'puede_ver');
     responder(200, ['ok' => true, 'data' => FacturaModel::listarCAI()]);
 }
 
-function caiActivo(): void {
+function caiActivo(array $sesion): void {
+    requirePermiso($sesion['rol_id'], 'cai', 'puede_ver');
     $cai = FacturaModel::obtenerCAIActivoConEstado();
     responder(200, ['ok' => true, 'data' => $cai]);
 }
 
 function caiInactivar(array $sesion): void {
-    requirePermiso($sesion['rol_id'], 'facturacion', 'puede_editar');
+    requirePermiso($sesion['rol_id'], 'cai', 'puede_editar');
     $d  = json_decode(file_get_contents('php://input'), true) ?? [];
     $id = (int)($d['id'] ?? 0);
     if (!$id) { responder(400, ['error' => 'id requerido']); return; }
@@ -173,7 +179,7 @@ function registrarPago(array $sesion): void {
 }
 
 function caiCrear(array $sesion): void {
-    requirePermiso($sesion['rol_id'], 'facturacion', 'puede_crear');
+    requirePermiso($sesion['rol_id'], 'cai', 'puede_crear');
     $d = json_decode(file_get_contents('php://input'), true) ?? [];
     if (empty($d['cai']) || empty($d['rango_inicio']) || empty($d['rango_fin']) || empty($d['fecha_limite_emision'])) {
         responder(400, ['error' => 'CAI, rango_inicio, rango_fin y fecha_limite_emision son requeridos']); return;
