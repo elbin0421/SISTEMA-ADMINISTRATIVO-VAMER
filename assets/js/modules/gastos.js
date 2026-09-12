@@ -97,12 +97,57 @@ function renderTablaGastos(rows) {
 }
 
 let gastoItems = [];
+let proveedoresGastoCache = [];
+
+async function cargarProveedoresGastoCache() {
+  const r = await api('controllers/ComprasController.php?action=proveedores&estado=activo');
+  proveedoresGastoCache = (r.ok && r.data.data) ? r.data.data : [];
+}
+
+function buscarProveedorGasto() {
+  const q = document.getElementById('gastoProveedor').value.trim().toLowerCase();
+  const div = document.getElementById('sugerenciasProveedorGasto');
+  if (q.length < 1) { div.style.display = 'none'; return; }
+  const matches = proveedoresGastoCache.filter(p => p.nombre.toLowerCase().includes(q)).slice(0, 8);
+  if (!matches.length) { div.style.display = 'none'; return; }
+  div.innerHTML = matches.map(p => `
+    <div style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)"
+      onmousedown="selProveedorGasto('${p.nombre.replace(/'/g,"\\'")}','${(p.rtn||'').replace(/'/g,"\\'")}')">
+      ${p.nombre} <span style="color:var(--muted);font-size:11px">${p.rtn || 'Sin RTN registrado'}</span>
+    </div>`).join('');
+  div.style.display = 'block';
+}
+
+function selProveedorGasto(nombre, rtn) {
+  document.getElementById('gastoProveedor').value = nombre;
+  if (rtn) { document.getElementById('gastoRTN').value = rtn; validarRTN(); }
+  document.getElementById('sugerenciasProveedorGasto').style.display = 'none';
+}
+
+function formatearNumDocValor(v) {
+  const digits = (v || '').replace(/\D/g, '').slice(0, 16); // 3+3+2+8 = 16 dígitos
+  let out = '';
+  if (digits.length > 0) out += digits.slice(0, 3);
+  if (digits.length > 3) out += '-' + digits.slice(3, 6);
+  if (digits.length > 6) out += '-' + digits.slice(6, 8);
+  if (digits.length > 8) out += '-' + digits.slice(8, 16);
+  return out;
+}
+
+function formatearNumDocGasto(el) {
+  const pos = el.value.length;
+  el.value = formatearNumDocValor(el.value);
+  // mantiene el cursor al final, suficiente para este patrón de escritura secuencial
+  if (el.value.length !== pos) el.setSelectionRange(el.value.length, el.value.length);
+}
 
 function abrirModalGasto() {
   document.getElementById('modalGastoTitulo').textContent = '🧾 Nuevo Gasto';
   ['gastoId','gastoNumDoc','gastoRTN','gastoProveedor','gastoObs'].forEach(id => {
     const e = document.getElementById(id); if (e) e.value = '';
   });
+  document.getElementById('sugerenciasProveedorGasto').style.display = 'none';
+  cargarProveedoresGastoCache();
   document.getElementById('gastoFecha').value    = new Date().toISOString().split('T')[0];
   document.getElementById('gastoTipoDoc').value  = 'factura';
   document.getElementById('gastoCategoria').value= 'servicios';
@@ -141,11 +186,13 @@ async function editarGasto(id) {
   if (!r.ok) { toast('Error.', 'error'); return; }
   const g = r.data.data;
   if (g.estado === 'declarado') { toast('Gasto declarado: no puede editarse.', 'error'); return; }
+  document.getElementById('sugerenciasProveedorGasto').style.display = 'none';
+  cargarProveedoresGastoCache();
   document.getElementById('modalGastoTitulo').textContent = '✏️ Editar Gasto';
   document.getElementById('gastoId').value       = g.id_gasto;
   document.getElementById('gastoFecha').value    = g.fecha;
   document.getElementById('gastoTipoDoc').value  = g.tipo_documento;
-  document.getElementById('gastoNumDoc').value   = g.numero_factura || '';
+  document.getElementById('gastoNumDoc').value   = formatearNumDocValor(g.numero_factura || '');
   document.getElementById('gastoCategoria').value= g.categoria;
   document.getElementById('gastoRTN').value      = g.rtn_proveedor || '';
   document.getElementById('gastoProveedor').value= g.nombre_proveedor;

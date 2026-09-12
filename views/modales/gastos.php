@@ -2,25 +2,39 @@
   <div class="modal" style="max-width:700px">
     <div class="modal-header">
       <h3 id="modalGastoTitulo">🧾 Nuevo Gasto</h3>
-      <button class="modal-close" onclick="cerrarModal('modalGasto')">✕</button>
     </div>
     <div class="modal-body">
       <div id="errGasto" class="error-msg" style="display:none"></div>
       <input type="hidden" id="gastoId">
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <!-- ── Proveedor (buscar registrado o escribir uno nuevo) ── -->
+      <div class="form-group" style="position:relative;margin-bottom:0">
+        <label class="form-label">Proveedor *</label>
+        <input type="text" id="gastoProveedor" class="form-control" placeholder="Buscar proveedor registrado o escribir uno nuevo..."
+          style="text-transform:uppercase" oninput="buscarProveedorGasto()" autocomplete="off">
+      </div>
+      <div id="sugerenciasProveedorGasto" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:6px;margin:2px 0 12px;max-height:160px;overflow-y:auto"></div>
+
+      <div style="display:grid;grid-template-columns:1fr 2fr;gap:12px;margin-bottom:12px">
+        <div>
+          <label class="form-label">RTN Proveedor</label>
+          <input type="text" id="gastoRTN" class="form-control" placeholder="0801199012345" maxlength="14"
+            oninput="this.value=this.value.replace(/\D/g,'');validarRTN()">
+          <div id="rtnMsg" style="font-size:11px;margin-top:3px;color:var(--muted)"></div>
+        </div>
+        <div><label class="form-label">N° Factura / Documento</label>
+          <input type="text" id="gastoNumDoc" class="form-control" placeholder="000-001-01-00000034" maxlength="19"
+            oninput="formatearNumDocGasto(this)">
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
         <div><label class="form-label">Fecha *</label><input type="date" id="gastoFecha" class="form-control"></div>
         <div><label class="form-label">Tipo de documento *</label>
           <select id="gastoTipoDoc" class="form-control">
             <option value="factura">Factura</option><option value="recibo">Recibo</option>
             <option value="ticket">Ticket</option><option value="otro">Otro</option>
           </select>
-        </div>
-      </div>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-        <div><label class="form-label">N° Factura / Documento</label>
-          <input type="text" id="gastoNumDoc" class="form-control" placeholder="001-001-01-00000123" style="text-transform:uppercase">
         </div>
         <div><label class="form-label">Categoría *</label>
           <select id="gastoCategoria" class="form-control">
@@ -30,18 +44,6 @@
             <option value="sueldos">Sueldos</option><option value="honorarios">Honorarios</option>
             <option value="utilities">Utilities</option><option value="otros">Otros</option>
           </select>
-        </div>
-      </div>
-
-      <div style="display:grid;grid-template-columns:1fr 2fr;gap:12px;margin-bottom:12px">
-        <div>
-          <label class="form-label">RTN Proveedor</label>
-          <input type="text" id="gastoRTN" class="form-control" placeholder="0801199012345" maxlength="14"
-            oninput="this.value=this.value.replace(/\D/g,'');validarRTN()">
-          <div id="rtnMsg" style="font-size:11px;margin-top:3px;color:var(--muted)"></div>
-        </div>
-        <div><label class="form-label">Nombre del Proveedor *</label>
-          <input type="text" id="gastoProveedor" class="form-control" placeholder="Razón social" style="text-transform:uppercase">
         </div>
       </div>
 
