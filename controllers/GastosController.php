@@ -11,13 +11,14 @@ $action = $_GET['action'] ?? 'listar';
 $method = $_SERVER['REQUEST_METHOD'];
 
 match(true) {
-    $action === 'listar'       && $method === 'GET'  => listar(),
-    $action === 'obtener'      && $method === 'GET'  => obtener(),
-    $action === 'crear'        && $method === 'POST' => crear($sesion),
-    $action === 'actualizar'   && $method === 'POST' => actualizar(),
-    $action === 'eliminar'     && $method === 'POST' => eliminar(),
-    $action === 'resumen'      && $method === 'GET'  => resumen(),
-    $action === 'declarar_mes' && $method === 'POST' => marcarDeclarado(),
+    $action === 'listar'          && $method === 'GET'  => listar(),
+    $action === 'obtener'         && $method === 'GET'  => obtener(),
+    $action === 'crear'           && $method === 'POST' => crear($sesion),
+    $action === 'actualizar'      && $method === 'POST' => actualizar(),
+    $action === 'eliminar'        && $method === 'POST' => eliminar(),
+    $action === 'resumen'         && $method === 'GET'  => resumen(),
+    $action === 'declarar_mes'    && $method === 'POST' => marcarDeclarado(),
+    $action === 'importar_masivo' && $method === 'POST' => importarMasivo($sesion),
     default => responder(400, ['error' => 'Acción no válida'])
 };
 
@@ -85,6 +86,20 @@ function marcarDeclarado(): void {
     if (!$mes || !$anio) { responder(400, ['error' => 'mes y anio requeridos']); return; }
     $n = GastosModel::declararMes($mes, $anio);
     responder(200, ['ok' => true, 'actualizados' => $n]);
+}
+
+function importarMasivo(array $sesion): void {
+    requirePermiso($sesion['rol_id'], 'gastos', 'puede_crear');
+    if ((int)($sesion['rol_id'] ?? 0) !== 1) {
+        responder(403, ['error' => 'La importación masiva de gastos está disponible solo para el Administrador.']);
+        return;
+    }
+    $d     = json_decode(file_get_contents('php://input'), true) ?? [];
+    $filas = $d['filas'] ?? [];
+    if (empty($filas)) { responder(400, ['error' => 'No se recibieron filas para importar.']); return; }
+    if (count($filas) > 1000) { responder(400, ['error' => 'Máximo 1000 filas por importación.']); return; }
+    $resultado = GastosModel::crearMasivo($filas, $sesion['usuario_id']);
+    responder(200, ['ok' => true] + $resultado);
 }
 
 function responder(int $code, array $data): void {

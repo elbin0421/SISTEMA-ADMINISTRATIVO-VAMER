@@ -124,3 +124,51 @@
     </div>
   </div>
 </div>
+
+<!-- ══════════════════════════════════════════════
+     MODAL IMPORTAR GASTOS MASIVAMENTE DESDE EXCEL
+     ══════════════════════════════════════════════ -->
+<div class="modal-bg" id="modalImportarGastos">
+  <div class="modal" style="max-width:820px;width:95%">
+    <div class="modal-header">
+      <h3>📥 Importar Gastos desde Excel</h3>
+    </div>
+    <div class="modal-body">
+      <div id="errImportGastos" class="error-msg" style="display:none"></div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:14px">
+        <div style="font-size:13px;color:var(--muted)">
+          1. Descarga la plantilla · 2. Llénala con tus gastos · 3. Súbela aquí para revisarla antes de guardar.
+        </div>
+        <button class="btn btn-secondary" onclick="descargarPlantillaGastos()">⬇️ Descargar plantilla</button>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Archivo Excel (.xlsx)</label>
+        <input type="file" id="archivoImportGastos" accept=".xlsx,.xls" onchange="onArchivoImportGastos(this)">
+      </div>
+
+      <div id="importGastosResumen" style="display:none;margin:10px 0;font-size:13px"></div>
+
+      <div id="importGastosPreviewWrap" style="display:none;max-height:340px;overflow-y:auto;border:1px solid var(--border);border-radius:8px">
+        <table style="width:100%;font-size:12px;border-collapse:collapse">
+          <thead style="position:sticky;top:0;background:var(--sidebar)">
+            <tr>
+              <th style="padding:6px 8px;text-align:left">Fila(s)</th>
+              <th style="padding:6px 8px;text-align:left">Fecha</th>
+              <th style="padding:6px 8px;text-align:left">Proveedor</th>
+              <th style="padding:6px 8px;text-align:left">Descripción</th>
+              <th style="padding:6px 8px;text-align:right">Total factura</th>
+              <th style="padding:6px 8px;text-align:left">Estado</th>
+            </tr>
+          </thead>
+          <tbody id="importGastosPreviewBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="cerrarModal('modalImportarGastos')">Cerrar</button>
+      <button class="btn btn-primary" id="btnConfirmarImportGastos" onclick="confirmarImportarGastos()" style="display:none">Importar filas válidas</button>
+    </div>
+  </div>
+</div>

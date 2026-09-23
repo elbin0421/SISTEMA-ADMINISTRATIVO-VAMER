@@ -233,6 +233,7 @@ class PagoModel {
             JOIN facturas f ON f.id_factura = p.factura_id
             JOIN usuarios u ON u.id_usuario = p.usuario_id
             WHERE p.cliente_id = ?
+             AND p.estado <> 'anulado'
             ORDER BY p.fecha DESC, p.id_pago DESC
         ");
         $stmt->execute([$cliente_id]);

@@ -152,6 +152,97 @@ class GastosModel {
         }
     }
 
+    public static function crearMasivo(array $filas, int $uid): array {
+        $tiposValidos = ['factura', 'recibo', 'ticket', 'otro'];
+        $categoriasValidas = ['materiales','servicios','alquiler','combustible','publicidad',
+                               'mantenimiento','sueldos','honorarios','utilities','otros'];
+
+        // 1. Validar cada fila individualmente (cada fila = un ítem de una factura)
+        $filasValidas = [];
+        $errores = [];
+        foreach ($filas as $i => $fila) {
+            $numFila = $fila['fila'] ?? ($i + 2);
+            $proveedor   = trim($fila['nombre_proveedor'] ?? '');
+            $descripcion = trim($fila['descripcion'] ?? '');
+            $monto       = (float)($fila['monto'] ?? 0);
+            $fecha       = trim($fila['fecha'] ?? '');
+            $fechaTs     = $fecha !== '' ? strtotime($fecha) : false;
+
+            if ($proveedor === '')   { $errores[] = ['fila' => $numFila, 'error' => 'Proveedor requerido.'];        continue; }
+            if ($descripcion === '') { $errores[] = ['fila' => $numFila, 'error' => 'Descripción requerida.'];      continue; }
+            if ($monto <= 0)         { $errores[] = ['fila' => $numFila, 'error' => 'Monto inválido.'];             continue; }
+            if ($fechaTs === false)  { $errores[] = ['fila' => $numFila, 'error' => 'Fecha inválida o faltante.'];  continue; }
+
+            $filasValidas[] = [
+                'fila_original'  => $numFila,
+                'fecha_ts'       => $fechaTs,
+                'proveedor'      => $proveedor,
+                'rtn'            => trim($fila['rtn_proveedor'] ?? ''),
+                'tipo_documento' => in_array($fila['tipo_documento'] ?? '', $tiposValidos, true)
+                                    ? $fila['tipo_documento'] : 'factura',
+                'numero_factura' => trim($fila['numero_factura'] ?? ''),
+                'categoria'      => in_array($fila['categoria'] ?? '', $categoriasValidas, true)
+                                    ? $fila['categoria'] : 'otros',
+                'tasa_isv'       => in_array((int)($fila['tasa_isv'] ?? 15), [0, 15, 18], true)
+                                    ? (int)$fila['tasa_isv'] : 15,
+                'deducible'      => in_array(strtoupper(trim((string)($fila['deducible'] ?? 'SI'))), ['NO', '0', 'FALSE'], true) ? 0 : 1,
+                'observaciones'  => trim($fila['observaciones'] ?? ''),
+                'descripcion'    => $descripcion,
+                'monto'          => $monto,
+            ];
+        }
+
+        // 2. Agrupar por factura: mismo proveedor + mismo N° Factura/Documento = una sola
+        //    factura con varios ítems (se suma y se totaliza junta). Sin número de
+        //    factura, cada fila se trata como una factura/gasto independiente.
+        $grupos = [];
+        foreach ($filasValidas as $fv) {
+            $key = $fv['numero_factura'] !== ''
+                 ? mb_strtoupper($fv['proveedor']) . '|' . mb_strtoupper($fv['numero_factura'])
+                 : '__fila_' . $fv['fila_original'];
+            $grupos[$key][] = $fv;
+        }
+
+        // 3. Crear un gasto por grupo, con un ítem por cada fila del grupo
+        $insertados = 0;
+        foreach ($grupos as $filasGrupo) {
+            $primero   = $filasGrupo[0];
+            $numsFilas = implode(', ', array_column($filasGrupo, 'fila_original'));
+            try {
+                $items = array_map(fn($f) => [
+                    'descripcion' => $f['descripcion'], 'cantidad' => 1, 'monto' => $f['monto'],
+                ], $filasGrupo);
+
+                $data = [
+                    'fecha'            => date('Y-m-d', $primero['fecha_ts']),
+                    'rtn_proveedor'    => $primero['rtn'],
+                    'nombre_proveedor' => $primero['proveedor'],
+                    'tipo_documento'   => $primero['tipo_documento'],
+                    'numero_factura'   => $primero['numero_factura'],
+                    'categoria'        => $primero['categoria'],
+                    'tasa_isv'         => $primero['tasa_isv'],
+                    'deducible'        => $primero['deducible'],
+                    'mes_declaracion'  => (int)date('n', $primero['fecha_ts']),
+                    'anio_declaracion' => (int)date('Y', $primero['fecha_ts']),
+                    'estado'           => 'pendiente',
+                    'observaciones'    => $primero['observaciones'],
+                    'items'            => $items,
+                ];
+                self::crear($data, $uid);
+                $insertados++;
+            } catch (Exception $e) {
+                $errores[] = ['fila' => $numsFilas, 'error' => $e->getMessage()];
+            }
+        }
+
+        return [
+            'insertados'      => $insertados,   // facturas/gastos creados
+            'total_filas'     => count($filas),
+            'total_facturas'  => count($grupos),
+            'errores'         => $errores,
+        ];
+    }
+
     public static function eliminar(int $id): bool {
         $chk = getDB()->prepare('SELECT estado FROM gastos_dmc WHERE id_gasto=?'); $chk->execute([$id]);
         $row = $chk->fetch();

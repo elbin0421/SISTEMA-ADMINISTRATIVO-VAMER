@@ -22,6 +22,9 @@
         <input type="text" id="buscarGasto" placeholder="Buscar proveedor…" oninput="filtrarGastosLocal()"
           style="padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;min-width:180px">
         <button class="btn btn-primary" onclick="abrirModalGasto()">+ Nuevo Gasto</button>
+        <?php if ((int)($sesion['rol_id'] ?? 0) === 1): ?>
+        <button class="btn btn-secondary" onclick="abrirModalImportarGastos()">📥 Importar Excel</button>
+        <?php endif; ?>
         <button class="btn btn-secondary" onclick="exportarGastosExcel()">📊 Excel</button>
         <button class="btn btn-secondary" onclick="exportarGastosPDF()">📄 PDF</button>
       </div>

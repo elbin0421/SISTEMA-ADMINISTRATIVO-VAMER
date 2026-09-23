@@ -52,6 +52,7 @@ class MovimientoModel {
             LEFT JOIN clientes c ON c.id_cliente = m.cliente_id
             LEFT JOIN facturas f ON f.id_factura = m.factura_id
             WHERE m.id_movimiento = ?
+            ORDER BY m.id_movimiento DESC
         ");
         $stmt->execute([$id]);
         $row = $stmt->fetch();

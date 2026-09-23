@@ -344,3 +344,235 @@ async function cargarResumenGastos(mes, anio) {
 async function marcarPeriodoDeclarado(){const mes=parseInt(document.getElementById('filtroGastoMes')?.value||0);const anio=parseInt(document.getElementById('filtroGastoAnio')?.value||0);if(!mes||!anio){toast('Selecciona mes y año.','error');return;}if(!await confirmDialog(`¿Marcar todos los gastos pendientes de ${MESES_GASTOS[mes]} ${anio} como declarados?
 
 No podrán editarse ni eliminarse después.`))return;const r=await api('controllers/GastosController.php?action=declarar_mes',{method:'POST',body:JSON.stringify({mes,anio})});if(r.ok){toast(`${r.data.actualizados} gasto(s) declarados.`,'success');cargarGastos();}else toast(r.data?.error||'Error.','error');}
+
+// ══════════════════════════════════════════════════════════
+// IMPORTACIÓN MASIVA DE GASTOS DESDE EXCEL
+// ══════════════════════════════════════════════════════════
+let importGastosFilas = [];
+
+const MAPEO_COLUMNAS_GASTOS = {
+  'fecha':                 'fecha',
+  'proveedor':             'nombre_proveedor',
+  'nombreproveedor':       'nombre_proveedor',
+  'rtn':                   'rtn_proveedor',
+  'rtnproveedor':          'rtn_proveedor',
+  'tipodocumento':         'tipo_documento',
+  'nfacturadocumento':     'numero_factura',
+  'nofacturadocumento':    'numero_factura',
+  'numerofactura':         'numero_factura',
+  'categoria':             'categoria',
+  'descripcion':           'descripcion',
+  'monto':                 'monto',
+  'tasaisv':               'tasa_isv',
+  'deducible':             'deducible',
+  'observaciones':         'observaciones',
+};
+
+function normalizarEncabezadoGasto(s) {
+  return (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+}
+
+function normalizarFilaGastoImport(rawRow) {
+  const out = {};
+  for (const k in rawRow) {
+    const campo = MAPEO_COLUMNAS_GASTOS[normalizarEncabezadoGasto(k)];
+    if (campo) out[campo] = rawRow[k];
+  }
+  return out;
+}
+
+function normalizarFechaGasto(v) {
+  if (v instanceof Date && !isNaN(v)) {
+    const y = v.getFullYear(), m = String(v.getMonth() + 1).padStart(2, '0'), d = String(v.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  const s = String(v || '').trim();
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  return null;
+}
+
+function validarFilaGastoImport(fila) {
+  const errores = [];
+  if (!fila.nombre_proveedor || !String(fila.nombre_proveedor).trim()) errores.push('Proveedor requerido');
+  if (!fila.descripcion || !String(fila.descripcion).trim()) errores.push('Descripción requerida');
+  const monto = parseFloat(fila.monto);
+  if (isNaN(monto) || monto <= 0) errores.push('Monto inválido');
+  if (!fila._fechaValida) errores.push('Fecha inválida o faltante');
+  return errores;
+}
+
+function abrirModalImportarGastos() {
+  importGastosFilas = [];
+  document.getElementById('archivoImportGastos').value = '';
+  document.getElementById('errImportGastos').style.display = 'none';
+  document.getElementById('importGastosResumen').style.display = 'none';
+  document.getElementById('importGastosPreviewWrap').style.display = 'none';
+  document.getElementById('btnConfirmarImportGastos').style.display = 'none';
+  abrirModal('modalImportarGastos');
+}
+
+function descargarPlantillaGastos() {
+  const headers = ['Fecha','Proveedor','RTN Proveedor','Tipo Documento','N° Factura/Documento','Categoría','Descripción','Monto','Tasa ISV','Deducible','Observaciones'];
+  const ejemplos = [
+    ['2026-08-15','FERRETERIA EL TORNILLO S. DE R.L.','08019876543210','factura','000-001-01-00000034','materiales','Compra de tornillos y pernos',1500,15,'SI','Compra para mantenimiento de flota'],
+    ['2026-08-15','FERRETERIA EL TORNILLO S. DE R.L.','08019876543210','factura','000-001-01-00000034','materiales','Compra de pintura anticorrosiva',850,15,'SI',''],
+    ['2026-08-16','TALLER MECANICO DIAZ','','recibo','','servicios','Reparación de frenos unidad TCB1850',2200,15,'SI',''],
+  ];
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...ejemplos]);
+  ws['!cols'] = [10,30,16,14,20,14,32,10,9,10,28].map(w => ({ wch: w }));
+
+  const instrucciones = [
+    ['INSTRUCCIONES PARA LLENAR LA PLANTILLA', ''],
+    ['', ''],
+    ['Fecha', 'Formato AAAA-MM-DD (ej. 2026-08-15) o DD/MM/AAAA'],
+    ['Proveedor', 'Nombre o razón social del proveedor'],
+    ['RTN Proveedor', 'Opcional. Solo números'],
+    ['Tipo Documento', 'Uno de: factura, recibo, ticket, otro'],
+    ['N° Factura/Documento', 'Opcional. Formato sugerido: 000-001-01-00000034'],
+    ['Categoría', 'Una de: materiales, servicios, alquiler, combustible, publicidad, mantenimiento, sueldos, honorarios, utilities, otros'],
+    ['Descripción', 'Obligatorio. Detalle de cada ítem del gasto'],
+    ['Monto', 'Obligatorio. Solo el subtotal de ese ítem (sin ISV); el sistema calcula el ISV automáticamente'],
+    ['Tasa ISV', 'Opcional. 0, 15 o 18. Si se deja vacío, se usa 15'],
+    ['Deducible', 'Opcional. SI o NO. Si se deja vacío, se asume SI'],
+    ['Observaciones', 'Opcional'],
+    ['', ''],
+    ['¿UNA FACTURA CON VARIOS ÍTEMS?', ''],
+    ['Repite el mismo Proveedor y el mismo N° Factura/Documento en varias filas seguidas: el sistema las agrupa automáticamente en UNA sola factura, sumando y totalizando todos sus ítems (ver filas de ejemplo 1 y 2 de la hoja "Gastos", que pertenecen a la misma factura 000-001-01-00000034).', ''],
+    ['Si dejas el N° Factura/Documento vacío, cada fila se registra como un gasto independiente (ver fila de ejemplo 3).', ''],
+    ['', ''],
+    ['No borres la fila de encabezados (fila 1). Puedes borrar las filas de ejemplo antes de subir el archivo.', ''],
+  ];
+  const wsInstr = XLSX.utils.aoa_to_sheet(instrucciones);
+  wsInstr['!cols'] = [24, 90].map(w => ({ wch: w }));
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Gastos');
+  XLSX.utils.book_append_sheet(wb, wsInstr, 'Instrucciones');
+  XLSX.writeFile(wb, 'Plantilla_Importar_Gastos_DMC.xlsx');
+}
+
+function onArchivoImportGastos(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const errEl = document.getElementById('errImportGastos');
+  errEl.style.display = 'none';
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, { type: 'array', cellDates: true });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const filasRaw = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      procesarFilasImportGastos(filasRaw);
+    } catch (err) {
+      errEl.textContent = 'No se pudo leer el archivo. Verifica que sea un Excel válido (.xlsx).';
+      errEl.style.display = 'block';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function procesarFilasImportGastos(filasRaw) {
+  const errEl = document.getElementById('errImportGastos');
+  if (!filasRaw.length) {
+    errEl.textContent = 'El archivo no tiene filas de datos.';
+    errEl.style.display = 'block';
+    return;
+  }
+  const filas = filasRaw.map((raw, i) => {
+    const norm = normalizarFilaGastoImport(raw);
+    const fechaNorm = normalizarFechaGasto(norm.fecha);
+    norm._fechaValida = !!fechaNorm;
+    norm.fecha = fechaNorm || norm.fecha;
+    const errores = validarFilaGastoImport(norm);
+    return { fila: i + 2, datos: norm, errores };
+  });
+
+  // Agrupar por factura: mismo proveedor + mismo N° Factura/Documento = una sola
+  // factura con varios ítems (se suma y se totaliza junta). Sin número de factura,
+  // cada fila queda como una factura/gasto independiente.
+  const grupos = new Map();
+  filas.forEach(f => {
+    const numFactura = (f.datos.numero_factura || '').trim().toUpperCase();
+    const proveedor  = (f.datos.nombre_proveedor || '').trim().toUpperCase();
+    const key = numFactura ? `${proveedor}|${numFactura}` : `__fila_${f.fila}`;
+    if (!grupos.has(key)) grupos.set(key, []);
+    grupos.get(key).push(f);
+  });
+
+  importGastosFilas = Array.from(grupos.values()).map(items => {
+    const errores = items.flatMap(it => it.errores.map(e => `Fila ${it.fila}: ${e}`));
+    const total = items.reduce((s, it) => s + (parseFloat(it.datos.monto) || 0), 0);
+    return {
+      filasOriginales: items.map(it => it.fila),
+      proveedor: items[0].datos.nombre_proveedor,
+      fecha: items[0].datos.fecha,
+      numeroFactura: items[0].datos.numero_factura,
+      items,
+      total,
+      errores,
+    };
+  });
+  renderPreviewImportGastos();
+}
+
+function renderPreviewImportGastos() {
+  const validos   = importGastosFilas.filter(g => !g.errores.length).length;
+  const invalidos = importGastosFilas.length - validos;
+  const totalFilas = importGastosFilas.reduce((s, g) => s + g.items.length, 0);
+
+  const resEl = document.getElementById('importGastosResumen');
+  resEl.style.display = 'block';
+  resEl.innerHTML = `<strong>${totalFilas}</strong> filas leídas agrupadas en <strong>${importGastosFilas.length}</strong> factura(s)/gasto(s) — ` +
+    `<span style="color:#3ea84e">${validos} válida(s)</span>` +
+    (invalidos ? `, <span style="color:var(--danger)">${invalidos} con error (no se importarán)</span>` : '');
+
+  document.getElementById('importGastosPreviewWrap').style.display = 'block';
+  document.getElementById('importGastosPreviewBody').innerHTML = importGastosFilas.map(g => `
+    <tr style="border-top:1px solid var(--border)">
+      <td style="padding:5px 8px">${g.filasOriginales.join(', ')}</td>
+      <td style="padding:5px 8px">${g.fecha || '—'}</td>
+      <td style="padding:5px 8px">${g.proveedor || '—'}</td>
+      <td style="padding:5px 8px">${g.items.length > 1
+          ? `${g.items.length} ítems: ` + g.items.map(it => it.datos.descripcion).join(' · ')
+          : (g.items[0].datos.descripcion || '—')}</td>
+      <td style="padding:5px 8px;text-align:right">${fmtMoneda(g.total)}</td>
+      <td style="padding:5px 8px">${g.errores.length ? `<span style="color:var(--danger)">❌ ${g.errores.join(' | ')}</span>` : '<span style="color:#3ea84e">✅ OK</span>'}</td>
+    </tr>`).join('');
+
+  document.getElementById('btnConfirmarImportGastos').style.display = validos ? 'inline-flex' : 'none';
+}
+
+async function confirmarImportarGastos() {
+  const gruposValidos = importGastosFilas.filter(g => !g.errores.length);
+  if (!gruposValidos.length) return;
+
+  // Aplana de nuevo a filas planas (una por ítem) para el backend, que agrupa igual
+  // por proveedor + N° factura.
+  const filasPlanas = gruposValidos.flatMap(g => g.items.map(it => ({ fila: it.fila, ...it.datos })));
+
+  const btn = document.getElementById('btnConfirmarImportGastos');
+  const txtOriginal = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Importando...';
+
+  const r = await api('controllers/GastosController.php?action=importar_masivo', {
+    method: 'POST', body: JSON.stringify({ filas: filasPlanas }),
+  });
+
+  btn.disabled = false; btn.textContent = txtOriginal;
+
+  if (!r.ok) { toast(r.data?.error || 'Error al importar.', 'error'); return; }
+
+  const { insertados, total_facturas, errores } = r.data;
+  if (errores && errores.length) {
+    toast(`Se importaron ${insertados} de ${total_facturas} factura(s)/gasto(s). Algunas filas fueron rechazadas por el servidor.`, 'warn');
+  } else {
+    toast(`${insertados} factura(s)/gasto(s) importados correctamente.`, 'success');
+  }
+  cerrarModal('modalImportarGastos');
+  cargarGastos();
+}
