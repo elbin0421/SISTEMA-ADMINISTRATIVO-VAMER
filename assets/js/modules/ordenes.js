@@ -129,6 +129,10 @@ async function abrirModalOT() {
   document.getElementById('tituloOT').textContent='Nueva Orden de Trabajo';
   document.getElementById('errOT').style.display='none';
   document.getElementById('sugerenciasClienteOT').style.display='none';
+  document.getElementById('otFotosInput').value='';
+  fotosOTExistentes = [];
+  fotosOTPendientes = [];
+  renderFotosOT();
   const selVeh = document.getElementById('otVehiculoSelect');
   if (selVeh) selVeh.innerHTML = '<option value="">— Seleccionar vehículo del cliente —</option>';
   renderCheckboxesTecnicos(document.getElementById('otTecnicosWrap'), []);
@@ -152,6 +156,10 @@ async function editarOT(id) {
   document.getElementById('otKm').value=o.kilometraje||'';
   document.getElementById('otMotor').value=o.numero_motor||'';
   document.getElementById('otChasis').value=o.numero_chasis||'';
+  document.getElementById('otFotosInput').value='';
+  fotosOTExistentes = o.fotos || [];
+  fotosOTPendientes = [];
+  renderFotosOT();
   // Cargar líneas de trabajo existentes
   lineasTrabajo = o.descripcion_trabajo ? o.descripcion_trabajo.split('\n').filter(l => l.trim()) : [];
   renderLineasTrabajo();
@@ -246,8 +254,105 @@ async function guardarOT() {
     descripcion_trabajo: desc,
     observaciones: document.getElementById('otObs').value.trim() };
   const r = await api('controllers/OrdenesController.php?action='+(id?'editar':'crear'), { method:'POST', body:JSON.stringify(body) });
-  if (r.ok) { cerrarModal('modalOT'); toast(id?'OT actualizada.':'OT creada correctamente.','success'); cargarOrdenes(); }
+  if (r.ok) {
+    const nuevoId = id || r.data.id;
+    if (!id && fotosOTPendientes.length) {
+      for (const f of fotosOTPendientes) { await subirFotoOT(nuevoId, f.dataUrl, f.nombre); }
+      fotosOTPendientes = [];
+    }
+    cerrarModal('modalOT'); toast(id?'OT actualizada.':'OT creada correctamente.','success'); cargarOrdenes();
+  }
   else { errEl.textContent=r.data?.error||'Error al guardar la OT.'; errEl.style.display='block'; }
+}
+
+// ── Fotos de recepción del equipo ───────────────────────────
+let fotosOTExistentes = []; // {id_foto, ruta, nombre_original} — OT ya guardada
+let fotosOTPendientes = []; // {dataUrl, nombre} — OT nueva, se suben al crear
+
+function comprimirImagenOT(file, maxDim = 1600, calidad = 0.75) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) { height = Math.round(height * maxDim / width); width = maxDim; }
+          else { width = Math.round(width * maxDim / height); height = maxDim; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', calidad));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function onSeleccionarFotosOT(input) {
+  const files = Array.from(input.files || []);
+  if (!files.length) return;
+  const idOT = document.getElementById('otId').value;
+
+  for (const file of files) {
+    if (!file.type.startsWith('image/')) continue;
+    try {
+      const dataUrl = await comprimirImagenOT(file);
+      if (idOT) await subirFotoOT(idOT, dataUrl, file.name);
+      else fotosOTPendientes.push({ dataUrl, nombre: file.name });
+    } catch (e) { toast('No se pudo procesar una de las fotos.', 'error'); }
+  }
+  input.value = '';
+  renderFotosOT();
+}
+
+async function subirFotoOT(ordenId, dataUrl, nombre) {
+  const r = await api('controllers/OrdenesController.php?action=subir_foto', {
+    method: 'POST',
+    body: JSON.stringify({ orden_id: ordenId, imagen_base64: dataUrl, nombre_original: nombre }),
+  });
+  if (r.ok) fotosOTExistentes.push(r.data.foto);
+  else toast(r.data?.error || 'Error al subir foto.', 'error');
+}
+
+function renderFotosOT() {
+  const grid = document.getElementById('otFotosGrid');
+  if (!grid) return;
+  const existentesHtml = fotosOTExistentes.map(f => `
+    <div style="position:relative;width:90px;height:90px">
+      <img src="${f.ruta}" style="width:100%;height:100%;object-fit:cover;border-radius:6px;border:1px solid var(--border);cursor:pointer" onclick="window.open('${f.ruta}','_blank')">
+      <button type="button" onclick="eliminarFotoOT(${f.id_foto})" title="Eliminar"
+        style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:var(--danger);color:#fff;border:none;cursor:pointer;font-size:11px;line-height:1">✕</button>
+    </div>`).join('');
+  const pendientesHtml = fotosOTPendientes.map((f, i) => `
+    <div style="position:relative;width:90px;height:90px">
+      <img src="${f.dataUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:6px;border:1px solid var(--border);opacity:.85">
+      <span style="position:absolute;bottom:2px;left:2px;background:rgba(0,0,0,.6);color:#fff;font-size:9px;padding:1px 4px;border-radius:3px">Pendiente</span>
+      <button type="button" onclick="quitarFotoPendienteOT(${i})" title="Quitar"
+        style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:var(--danger);color:#fff;border:none;cursor:pointer;font-size:11px;line-height:1">✕</button>
+    </div>`).join('');
+  grid.innerHTML = (existentesHtml + pendientesHtml) || '<p style="color:var(--muted);font-size:12px;margin:0">Sin fotos aún.</p>';
+}
+
+function quitarFotoPendienteOT(i) {
+  fotosOTPendientes.splice(i, 1);
+  renderFotosOT();
+}
+
+async function eliminarFotoOT(idFoto) {
+  if (!await confirmDialog('¿Eliminar esta foto?')) return;
+  const r = await api('controllers/OrdenesController.php?action=eliminar_foto', {
+    method: 'POST', body: JSON.stringify({ id: idFoto }),
+  });
+  if (r.ok) {
+    fotosOTExistentes = fotosOTExistentes.filter(f => f.id_foto !== idFoto);
+    renderFotosOT();
+    toast('Foto eliminada.', 'success');
+  } else toast(r.data?.error || 'Error.', 'error');
 }
 
 async function verDetalleOT(id) {
@@ -274,6 +379,13 @@ async function verDetalleOT(id) {
       ${o.kilometraje ? `<div><span style="color:var(--muted)">Km:</span> ${o.kilometraje.toLocaleString()}</div>` : ''}
       ${o.numero_motor ? `<div><span style="color:var(--muted)">Motor:</span> ${o.numero_motor}</div>` : ''}
       ${o.numero_chasis ? `<div><span style="color:var(--muted)">Chasis:</span> ${o.numero_chasis}</div>` : ''}
+    </div>`;
+  }
+
+  if (o.fotos && o.fotos.length) {
+    h += `<div class="section-title">📸 Fotos de recepción</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">
+      ${o.fotos.map(f => `<img src="${f.ruta}" style="width:90px;height:90px;object-fit:cover;border-radius:6px;border:1px solid var(--border);cursor:pointer" onclick="window.open('${f.ruta}','_blank')">`).join('')}
     </div>`;
   }
 

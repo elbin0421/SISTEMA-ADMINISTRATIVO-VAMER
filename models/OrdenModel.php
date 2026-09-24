@@ -48,8 +48,7 @@ class OrdenModel {
             SELECT e.id_empleado, CONCAT(e.nombres, ' ', e.apellidos) AS nombre, e.puesto, e.salario_mensual
             FROM orden_tecnicos ott
             JOIN empleados e ON e.id_empleado = ott.empleado_id
-            WHERE ott.orden_id = ? 
-            ORDER BY e.apellidos, e.nombres
+            WHERE ott.orden_id = ? ORDER BY e.apellidos, e.nombres
         ");
         $s->execute([$id]);
         $ot['tecnicos'] = $s->fetchAll();
@@ -68,6 +67,10 @@ class OrdenModel {
         $s = $pdo->prepare("SELECT * FROM detalle_orden_mano_obra WHERE orden_id = ?");
         $s->execute([$id]);
         $ot['mano_obra'] = $s->fetchAll();
+
+        $s = $pdo->prepare("SELECT id_foto, ruta, nombre_original, fecha_subida FROM orden_fotos WHERE orden_id = ? ORDER BY fecha_subida");
+        $s->execute([$id]);
+        $ot['fotos'] = $s->fetchAll();
 
         $ot['total_materiales'] = array_sum(array_column($ot['materiales'], 'subtotal'));
         $ot['total_mano_obra']  = array_sum(array_column($ot['mano_obra'],  'subtotal'));
@@ -100,6 +103,31 @@ class OrdenModel {
         );
         $stmt->execute();
         return $stmt->fetchAll();
+    }
+
+    public static function agregarFoto(int $orden_id, string $ruta, string $nombreOriginal, int $usuario_id): int {
+        $pdo = getDB();
+        $pdo->prepare("
+            INSERT INTO orden_fotos (orden_id, ruta, nombre_original, usuario_id)
+            VALUES (?,?,?,?)
+        ")->execute([$orden_id, $ruta, $nombreOriginal, $usuario_id]);
+        return (int)$pdo->lastInsertId();
+    }
+
+    public static function obtenerFoto(int $id_foto): ?array {
+        $stmt = getDB()->prepare("SELECT * FROM orden_fotos WHERE id_foto = ?");
+        $stmt->execute([$id_foto]);
+        return $stmt->fetch() ?: null;
+    }
+
+    public static function listarFotos(int $orden_id): array {
+        $stmt = getDB()->prepare("SELECT id_foto, ruta, nombre_original, fecha_subida FROM orden_fotos WHERE orden_id = ? ORDER BY fecha_subida");
+        $stmt->execute([$orden_id]);
+        return $stmt->fetchAll();
+    }
+
+    public static function eliminarFoto(int $id_foto): bool {
+        return (bool) getDB()->prepare("DELETE FROM orden_fotos WHERE id_foto = ?")->execute([$id_foto]);
     }
 
     public static function quitarMaterial(int $detalle_id): bool {

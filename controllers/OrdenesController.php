@@ -25,6 +25,9 @@ match(true) {
     $action === 'quitar_material'  && $method === 'POST' => quitarMaterial($sesion),
     $action === 'agregar_mo'       && $method === 'POST' => agregarManoObra($sesion),
     $action === 'quitar_mo'        && $method === 'POST' => quitarManoObra($sesion),
+    $action === 'fotos'            && $method === 'GET'  => listarFotos(),
+    $action === 'subir_foto'       && $method === 'POST' => subirFoto($sesion),
+    $action === 'eliminar_foto'    && $method === 'POST' => eliminarFoto($sesion),
     default => responder(400, ['error' => 'Accion no valida'])
 };
 
@@ -222,6 +225,61 @@ function quitarManoObra(array $sesion): void {
     $id = (int)($d['id'] ?? 0);
     if (!$id) { responder(400, ['error' => 'ID requerido.']); return; }
     OrdenModel::quitarManoObra($id);
+    responder(200, ['ok' => true]);
+}
+
+function listarFotos(): void {
+    $ordenId = (int)($_GET['orden_id'] ?? 0);
+    if (!$ordenId) { responder(400, ['error' => 'orden_id requerido.']); return; }
+    responder(200, ['ok' => true, 'data' => OrdenModel::listarFotos($ordenId)]);
+}
+
+function subirFoto(array $sesion): void {
+    requirePermiso($sesion['rol_id'], 'ordenes_trabajo', 'puede_editar');
+    $d       = json_decode(file_get_contents('php://input'), true) ?? [];
+    $ordenId = (int)($d['orden_id'] ?? 0);
+    $base64  = $d['imagen_base64'] ?? '';
+    $nombre  = trim($d['nombre_original'] ?? 'foto.jpg');
+
+    if (!$ordenId) { responder(400, ['error' => 'orden_id requerido.']); return; }
+    if (!$base64)  { responder(400, ['error' => 'Imagen requerida.']); return; }
+
+    if (!preg_match('/^data:image\/(jpeg|jpg|png|webp);base64,(.+)$/', $base64, $m)) {
+        responder(400, ['error' => 'Formato de imagen no válido.']); return;
+    }
+    $ext  = $m[1] === 'jpeg' ? 'jpg' : $m[1];
+    $data = base64_decode($m[2]);
+    if ($data === false) { responder(400, ['error' => 'No se pudo procesar la imagen.']); return; }
+    if (strlen($data) > 8 * 1024 * 1024) { responder(400, ['error' => 'La imagen supera el tamaño máximo (8MB).']); return; }
+
+    $dir = __DIR__ . "/../assets/uploads/ordenes/{$ordenId}";
+    if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
+        responder(500, ['error' => 'No se pudo crear el directorio de subida.']); return;
+    }
+    $archivo = uniqid('ot_' . $ordenId . '_') . '.' . $ext;
+    if (file_put_contents("$dir/$archivo", $data) === false) {
+        responder(500, ['error' => 'No se pudo guardar la imagen en el servidor.']); return;
+    }
+
+    $rutaRelativa = "assets/uploads/ordenes/{$ordenId}/{$archivo}";
+    $idFoto = OrdenModel::agregarFoto($ordenId, $rutaRelativa, $nombre, $sesion['usuario_id']);
+    responder(201, ['ok' => true, 'foto' => [
+        'id_foto' => $idFoto, 'ruta' => $rutaRelativa, 'nombre_original' => $nombre,
+    ]]);
+}
+
+function eliminarFoto(array $sesion): void {
+    requirePermiso($sesion['rol_id'], 'ordenes_trabajo', 'puede_editar');
+    $d      = json_decode(file_get_contents('php://input'), true) ?? [];
+    $idFoto = (int)($d['id'] ?? 0);
+    if (!$idFoto) { responder(400, ['error' => 'ID requerido.']); return; }
+
+    $foto = OrdenModel::obtenerFoto($idFoto);
+    if (!$foto) { responder(404, ['error' => 'Foto no encontrada.']); return; }
+
+    $rutaFisica = __DIR__ . '/../' . $foto['ruta'];
+    if (is_file($rutaFisica)) @unlink($rutaFisica);
+    OrdenModel::eliminarFoto($idFoto);
     responder(200, ['ok' => true]);
 }
 

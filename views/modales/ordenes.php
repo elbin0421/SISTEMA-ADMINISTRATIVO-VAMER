@@ -41,6 +41,12 @@
       <div class="form-group"><label>No. Motor</label><input type="text" id="otMotor"></div>
       <div class="form-group"><label>No. Chasis</label><input type="text" id="otChasis"></div>
     </div>
+    <div class="section-title">📸 Fotos de recepción y entrega del equipo</div>
+    <div class="form-group">
+      <input type="file" id="otFotosInput" accept="image/*" multiple onchange="onSeleccionarFotosOT(this)">
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">Fotografía el estado en que se recibió el equipo (rayones, golpes, faltantes, etc.). Puedes seleccionar varias a la vez.</div>
+      <div id="otFotosGrid" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px"></div>
+    </div>
     <div class="section-title">🔧 Trabajo</div>
     <div class="form-group">
       <label>Descripción del trabajo *</label>
