@@ -188,12 +188,14 @@ class PagoModel {
         }
         $stmt = getDB()->prepare("
             SELECT
-                f.fecha,f.numero_factura, cl.nombre AS cliente,  f.total,
+                f.id_factura, f.numero_factura, f.fecha, f.total,
+                f.cliente_id,
                 f.estado AS factura_estado,
                 COALESCE(pg.pagado, 0)           AS total_pagado,
                 f.total - COALESCE(pg.pagado, 0) AS saldo_pendiente,
                 COALESCE(pg.ret_isr, 0)          AS retencion_isr,
                 COALESCE(pg.ret_isv, 0)          AS retencion_isv,
+                cl.nombre AS cliente, cl.rtn AS cliente_rtn,
                 COALESCE(cl.dias_credito, 0)     AS dias_credito,
                 cot.numero_cotizacion,
                 DATEDIFF(CURDATE(), f.fecha)     AS dias_transcurridos,

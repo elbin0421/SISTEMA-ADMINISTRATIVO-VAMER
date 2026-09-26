@@ -393,13 +393,15 @@ async function confirmarFacturarCotizacion() {
 }
 
 // ── PAGO DE FACTURA ──────────────────────────────────────
-function abrirPagoFactura(factura_id, numero, total, subtotal) {
+function abrirPagoFactura(factura_id, numero, total, saldoPendienteAprox) {
   metodoPagoFacSeleccionado = '';
+  const saldoInicial = Math.max(0, parseFloat(saldoPendienteAprox) || 0);
   document.getElementById('pagoFacturaId').value       = factura_id;
-  document.getElementById('pagoFacturaSubtotal').value = subtotal || 0;
+  document.getElementById('pagoFacturaTotal').value    = total || 0;
+  document.getElementById('pagoFacturaSubtotal').value = 0; // se refina abajo con el valor real del servidor
   document.getElementById('pagoFacturaInfo').textContent = `Factura: ${numero} | Total: ${fmtMoneda(total)}`;
-  document.getElementById('pagoSaldoPendiente').textContent = fmtMoneda(total);
-  document.getElementById('pagoMonto').value  = '';
+  document.getElementById('pagoSaldoPendiente').textContent = fmtMoneda(saldoInicial);
+  document.getElementById('pagoMonto').value  = saldoInicial > 0 ? saldoInicial.toFixed(2) : '';
   document.getElementById('pagoFecha').value  = new Date().toISOString().slice(0, 10);
   document.getElementById('pagoRefFac').value = '';
   document.getElementById('pagoRefGrupoFac').style.display = 'none';
@@ -418,24 +420,24 @@ function abrirPagoFactura(factura_id, numero, total, subtotal) {
     el.style.background  = '';
   });
 
-  // Cargar saldo pendiente real desde el servidor
+  abrirModal('modalRegistrarPago');
+
+  // Refinar con los datos exactos del servidor (subtotal, total y saldo real pendiente)
   api('controllers/FacturacionController.php?action=obtener&id=' + factura_id).then(r => {
     if (r.ok) {
       const f = r.data.data;
-      const subtotalReal = parseFloat(f.subtotal) || 0;
-      document.getElementById('pagoFacturaSubtotal').value = subtotalReal;
-      // Calcular ya pagado
-      api('controllers/FacturacionController.php?action=saldo_pendiente&id=' + factura_id).then(rs => {
-        if (rs.ok && rs.data.pendiente !== undefined) {
-          document.getElementById('pagoSaldoPendiente').textContent = fmtMoneda(rs.data.pendiente);
-          document.getElementById('pagoMonto').value = rs.data.pendiente.toFixed(2);
-          pagoRecalcular();
-        }
-      });
+      document.getElementById('pagoFacturaSubtotal').value = parseFloat(f.subtotal) || 0;
+      document.getElementById('pagoFacturaTotal').value    = parseFloat(f.total)    || 0;
     }
+    api('controllers/FacturacionController.php?action=saldo_pendiente&id=' + factura_id).then(rs => {
+      if (rs.ok && rs.data.pendiente !== undefined) {
+        const pendiente = parseFloat(rs.data.pendiente) || 0;
+        document.getElementById('pagoSaldoPendiente').textContent = fmtMoneda(pendiente);
+        document.getElementById('pagoMonto').value = pendiente > 0 ? pendiente.toFixed(2) : '';
+      }
+      pagoRecalcular();
+    });
   });
-
-  abrirModal('modalRegistrarPago');
 }
 
 function pagoToggleRetencion(tipo) {
@@ -446,15 +448,20 @@ function pagoToggleRetencion(tipo) {
 }
 
 function pagoRecalcular() {
-  const monto     = parseFloat(document.getElementById('pagoMonto').value)    || 0;
+  const monto     = parseFloat(document.getElementById('pagoMonto').value)          || 0;
   const subtotal  = parseFloat(document.getElementById('pagoFacturaSubtotal').value) || 0;
+  const total     = parseFloat(document.getElementById('pagoFacturaTotal').value)    || 0;
   const chkISR    = document.getElementById('chkRetencionISR').checked;
   const chkISV    = document.getElementById('chkRetencionISV').checked;
 
-  // Calcular retenciones sobre el subtotal proporcional al monto pagado
-  // Si el monto pagado es igual al total, la base es el subtotal completo
-  const retISR = chkISR ? parseFloat((subtotal * 0.01).toFixed(2))   : 0;
-  const retISV = chkISV ? parseFloat((subtotal * 0.125).toFixed(2))  : 0;
+  // Las retenciones se calculan sobre la porción SIN ISV del monto que se está
+  // cobrando ahora (no sobre el subtotal completo de la factura), para que un
+  // abono parcial retenga proporcionalmente a lo que realmente se está pagando.
+  const proporcionSubtotal = total > 0 ? (subtotal / total) : 0;
+  const baseRetencion = monto * proporcionSubtotal;
+
+  const retISR = chkISR ? parseFloat((baseRetencion * 0.01)   .toFixed(2)) : 0;
+  const retISV = chkISV ? parseFloat((baseRetencion * 0.125)  .toFixed(2)) : 0;
   const neto   = parseFloat((monto - retISR - retISV).toFixed(2));
 
   if (chkISR) document.getElementById('pagoRetencionISR').value = retISR.toFixed(2);

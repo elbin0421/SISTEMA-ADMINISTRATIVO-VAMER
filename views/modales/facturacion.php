@@ -15,6 +15,7 @@
     <div class="alert alert-error" id="errPago"></div>
     <input type="hidden" id="pagoFacturaId">
     <input type="hidden" id="pagoFacturaSubtotal">
+    <input type="hidden" id="pagoFacturaTotal">
     <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px">
       <div id="pagoFacturaInfo" style="color:var(--muted);margin-bottom:6px"></div>
       <div style="display:flex;justify-content:space-between;align-items:center">
