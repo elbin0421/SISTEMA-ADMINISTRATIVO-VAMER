@@ -3,7 +3,7 @@
     <div class="card-header">
       <h4>🚗 Vehículos</h4>
       <div class="btn-group">
-        <input type="text" id="buscarVehiculo" placeholder="🔍 Buscar placa, marca, cliente..."
+        <input type="text" id="buscarVehiculo" placeholder="🔍 Buscar unidad, placa, tipo, cliente..."
           oninput="filtrarVehiculos()"
           style="padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;outline:none;width:220px">
         <select id="filtroEstadoVehiculo" onchange="cargarVehiculos()"

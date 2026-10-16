@@ -38,8 +38,9 @@ function renderTablaVehiculos(data) {
   let h = `<table>
     <thead>
       <tr>
+        <th>Unidad</th>
         <th>Placa</th>
-        <th>Marca / Modelo</th>
+        <th>Tipo Vehículo</th>
         <th>Año</th>
         <th>Color</th>
         <th>Cliente</th>
@@ -51,10 +52,10 @@ function renderTablaVehiculos(data) {
     </thead>
     <tbody>`;
   pag.slice.forEach(v => {
-    const marca = [v.marca, v.modelo].filter(Boolean).join(' ') || '—';
     h += `<tr>
       <td><strong style="color:var(--accent);font-size:13px">${v.placa}</strong></td>
-      <td>${marca}</td>
+      <td>${v.marca || '—'}</td>
+      <td>${v.modelo || '—'}</td>
       <td>${v.anio || '—'}</td>
       <td>${v.color || '—'}</td>
       <td>${v.cliente}</td>
@@ -95,15 +96,17 @@ function filtrarVehiculos() {
 
 // ── MODAL NUEVO / EDITAR ─────────────────────────────────────
 
-function abrirModalVehiculo() {
+async function abrirModalVehiculo() {
   document.getElementById('vId').value = '';
   document.getElementById('vClienteBuscar').value = '';
   document.getElementById('vClienteId').value = '';
   document.getElementById('sugerenciasClienteVehiculo').style.display = 'none';
-  ['vPlaca','vMarca','vModelo','vColor','vMotor','vChasis','vObservaciones'].forEach(id => document.getElementById(id).value = '');
+  ['vPlaca','vMarca','vColor','vMotor','vChasis','vObservaciones'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('vAnio').value = '';
   document.getElementById('tituloVehiculo').textContent = 'Nuevo Vehículo';
   document.getElementById('errVehiculo').style.display = 'none';
+  await cargarTiposVehiculoCache();
+  llenarSelectTipoVehiculo(document.getElementById('vModelo'), '');
   abrirModal('modalVehiculo');
 }
 
@@ -115,14 +118,15 @@ async function editarVehiculo(id) {
   document.getElementById('vClienteId').value       = v.cliente_id;
   document.getElementById('vPlaca').value           = v.placa       || '';
   document.getElementById('vMarca').value           = v.marca       || '';
-  document.getElementById('vModelo').value          = v.modelo      || '';
+  await cargarTiposVehiculoCache();
+  llenarSelectTipoVehiculo(document.getElementById('vModelo'), v.modelo || '');
   document.getElementById('vAnio').value            = v.anio        || '';
   document.getElementById('vColor').value           = v.color       || '';
   document.getElementById('vMotor').value           = v.numero_motor  || '';
   document.getElementById('vChasis').value          = v.numero_chasis || '';
   document.getElementById('vObservaciones').value   = v.observaciones || '';
   document.getElementById('errVehiculo').style.display = 'none';
-  document.getElementById('tituloVehiculo').textContent = 'Editar Vehículo — ' + v.placa;
+  document.getElementById('tituloVehiculo').textContent = 'Editar Vehículo — Unidad ' + v.placa + (v.marca ? ' (Placa ' + v.marca + ')' : '');
   // Mostrar cliente en el buscador
   const rc = await api('controllers/ClientesController.php?action=obtener&id=' + v.cliente_id);
   if (rc.ok) document.getElementById('vClienteBuscar').value = rc.data.data.nombre || '';
@@ -137,7 +141,7 @@ async function guardarVehiculo() {
   errEl.style.display = 'none';
 
   if (!clienteId) { errEl.textContent = 'Selecciona un cliente.';  errEl.style.display = 'block'; return; }
-  if (!placa)     { errEl.textContent = 'La placa es obligatoria.'; errEl.style.display = 'block'; return; }
+  if (!placa)     { errEl.textContent = 'La unidad es obligatoria.'; errEl.style.display = 'block'; return; }
 
   const body = {
     id:            id ? +id : undefined,
@@ -157,9 +161,17 @@ async function guardarVehiculo() {
     method: 'POST', body: JSON.stringify(body)
   });
   if (r.ok) {
+    document.getElementById('modalVehiculo').classList.remove('sobre-modal');
     cerrarModal('modalVehiculo');
     toast(id ? 'Vehículo actualizado.' : 'Vehículo registrado correctamente.', 'success');
     cargarVehiculos();
+    if (!id && vehiculoRapidoCallback) {
+      vehiculoRapidoCallback = false;
+      const nuevoId = r.data.id;
+      await cargarVehiculosOT(vehiculoRapidoClienteId);
+      const sel = document.getElementById('otVehiculoSelect');
+      if (sel) { sel.value = nuevoId; autoLlenarVehiculoOT(); }
+    }
   } else {
     errEl.textContent = r.data.error || 'Error al guardar.';
     errEl.style.display = 'block';

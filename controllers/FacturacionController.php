@@ -23,6 +23,7 @@ match(true) {
     $action === 'kpis'             && $method === 'GET'  => kpis($sesion),
     $action === 'cai_listar'       && $method === 'GET'  => caiListar($sesion),
     $action === 'cai_activo'       && $method === 'GET'  => caiActivo($sesion),
+    $action === 'cai_validar'      && $method === 'GET'  => caiValidar($sesion),
     $action === 'facturar'          && $method === 'POST' => facturar($sesion),
     $action === 'facturar_multiple' && $method === 'POST' => facturarMultiple($sesion),
     $action === 'facturar_movimientos' && $method === 'POST' => facturarMovimientos($sesion),
@@ -80,6 +81,16 @@ function caiActivo(array $sesion): void {
     requirePermiso($sesion['rol_id'], 'cai', 'puede_ver');
     $cai = FacturaModel::obtenerCAIActivoConEstado();
     responder(200, ['ok' => true, 'data' => $cai]);
+}
+
+function caiValidar(array $sesion): void {
+    // Cualquier usuario que pueda facturar necesita saber si el CAI permite emitir.
+    try {
+        $cai = FacturaModel::obtenerCAIParaEmitir();
+        responder(200, ['ok' => true, 'data' => $cai]);
+    } catch (Exception $e) {
+        responder(400, ['error' => $e->getMessage()]);
+    }
 }
 
 function caiInactivar(array $sesion): void {

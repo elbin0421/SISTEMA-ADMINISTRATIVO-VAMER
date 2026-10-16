@@ -70,11 +70,11 @@ async function cargarInicio() {
     // OT recientes
     const elOTR = document.getElementById('otRecientes');
     if (elOTR) {
-      const rows = d.ot_recientes || [];
+      const rows = (d.ot_recientes || []).slice(0, 5);
       let h = '<table><thead><tr><th>OT</th><th>Cliente</th><th>Vehículo</th><th>Apertura</th><th>Estado</th></tr></thead><tbody>';
       if (!rows.length) h += '<tr><td colspan="5" class="empty-state">Sin órdenes recientes</td></tr>';
       rows.forEach(o => {
-        const veh = [o.marca, o.modelo, o.placa].filter(Boolean).join(' ') || '—';
+        const veh = [o.placa ? 'Unidad ' + o.placa : '', o.modelo, o.marca ? '(' + o.marca + ')' : ''].filter(Boolean).join(' ') || '—';
         h += `<tr>
           <td><strong>${o.numero_orden}</strong></td>
           <td>${o.cliente}</td>

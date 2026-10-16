@@ -157,42 +157,33 @@ function cambiarEstado(array $sesion): void {
 function agregarMaterial(array $sesion): void {
     requirePermiso($sesion['rol_id'], 'ordenes_trabajo', 'puede_editar');
     $d      = json_decode(file_get_contents('php://input'), true) ?? [];
-    $ordId  = (int)($d['orden_id']       ?? 0);
-    $matId  = (int)($d['material_id']    ?? 0);
-    $cant   = (float)($d['cantidad']     ?? 0);
+    $ordId  = (int)($d['orden_id']        ?? 0);
+    $matId  = (int)($d['material_id']     ?? 0) ?: null;
+    $desc   = trim($d['descripcion']      ?? '');
+    $um     = trim($d['unidad_medida']    ?? '');
+    $cant   = (float)($d['cantidad']      ?? 0);
     $precio = (float)($d['precio_unitario'] ?? 0);
-    if (!$ordId || !$matId || $cant <= 0) {
+    if (!$ordId || $cant <= 0 || (!$matId && !$desc)) {
         responder(400, ['error' => 'Datos invalidos.']); return;
     }
     $pdo = getDB();
-    $mat = $pdo->prepare("SELECT stock, nombre FROM materiales WHERE id_material=?");
-    $mat->execute([$matId]);
-    $row = $mat->fetch();
-    if (!$row) { responder(404, ['error' => 'Material no encontrado.']); return; }
-    if ($row['stock'] < $cant) {
-        responder(400, ['error' => "Stock insuficiente de '{$row['nombre']}'. Disponible: {$row['stock']}"]); return;
+    // Materiales de OT son solo una lista: NO descuentan inventario.
+    if ($matId) {
+        $mat = $pdo->prepare("SELECT nombre, unidad_medida FROM materiales WHERE id_material=?");
+        $mat->execute([$matId]);
+        $row = $mat->fetch();
+        if ($row) {
+            $desc = $desc ?: $row['nombre'];
+            $um   = $um ?: $row['unidad_medida'];
+        } else {
+            $matId = null;
+        }
     }
-    // ¿Ya existe el material en esta OT?
-    $existe = $pdo->prepare("SELECT id_detalle_om, cantidad FROM detalle_orden_materiales WHERE orden_id=? AND material_id=?");
-    $existe->execute([$ordId, $matId]);
-    $linea = $existe->fetch();
-    if ($linea) {
-        // Actualizar cantidad y descontar manualmente (trigger solo actúa en INSERT)
-        $nuevaCant = $linea['cantidad'] + $cant;
-        $pdo->prepare("UPDATE detalle_orden_materiales SET cantidad=?, subtotal=? WHERE id_detalle_om=?")
-            ->execute([$nuevaCant, $nuevaCant * $precio, $linea['id_detalle_om']]);
-        $pdo->prepare("UPDATE materiales SET stock = stock - ? WHERE id_material=?")->execute([$cant, $matId]);
-        $pdo->prepare("
-            INSERT INTO movimientos_inventario
-              (material_id, tipo, cantidad, costo_unitario, tipo_referencia, referencia_id, usuario_id, observaciones)
-            SELECT ?, 'salida', ?, ?, 'orden_trabajo', ot.id_orden, ot.usuario_id, CONCAT('OT ', ot.numero_orden)
-            FROM ordenes_trabajo ot WHERE ot.id_orden = ?
-        ")->execute([$matId, $cant, $precio, $ordId]);
-    } else {
-        // Insert nuevo — el trigger maneja inventario automáticamente
-        $pdo->prepare("INSERT INTO detalle_orden_materiales (orden_id, material_id, cantidad, precio_unitario, subtotal) VALUES (?,?,?,?,?)")
-            ->execute([$ordId, $matId, $cant, $precio, $cant * $precio]);
-    }
+    $pdo->prepare("
+        INSERT INTO detalle_orden_materiales
+          (orden_id, material_id, descripcion, unidad_medida, cantidad, precio_unitario, subtotal)
+        VALUES (?,?,?,?,?,?,?)
+    ")->execute([$ordId, $matId, $desc, $um ?: 'unidad', $cant, $precio, $cant * $precio]);
     responder(201, ['ok' => true]);
 }
 
@@ -202,7 +193,6 @@ function quitarMaterial(array $sesion): void {
     $id = (int)($d['id'] ?? 0);
     if (!$id) { responder(400, ['error' => 'ID requerido.']); return; }
     OrdenModel::quitarMaterial($id);
-    // El trigger trg_ot_revertir_inventario devuelve el stock automáticamente
     responder(200, ['ok' => true]);
 }
 
@@ -239,18 +229,22 @@ function subirFoto(array $sesion): void {
     $d       = json_decode(file_get_contents('php://input'), true) ?? [];
     $ordenId = (int)($d['orden_id'] ?? 0);
     $base64  = $d['imagen_base64'] ?? '';
-    $nombre  = trim($d['nombre_original'] ?? 'foto.jpg');
+    $nombre  = trim($d['nombre_original'] ?? 'archivo');
 
     if (!$ordenId) { responder(400, ['error' => 'orden_id requerido.']); return; }
-    if (!$base64)  { responder(400, ['error' => 'Imagen requerida.']); return; }
+    if (!$base64)  { responder(400, ['error' => 'Archivo requerido.']); return; }
 
-    if (!preg_match('/^data:image\/(jpeg|jpg|png|webp);base64,(.+)$/', $base64, $m)) {
-        responder(400, ['error' => 'Formato de imagen no válido.']); return;
+    if (preg_match('/^data:image\/(jpeg|jpg|png|webp);base64,(.+)$/', $base64, $m)) {
+        $ext  = $m[1] === 'jpeg' ? 'jpg' : $m[1];
+        $data = base64_decode($m[2]);
+    } elseif (preg_match('/^data:application\/pdf;base64,(.+)$/', $base64, $m)) {
+        $ext  = 'pdf';
+        $data = base64_decode($m[1]);
+    } else {
+        responder(400, ['error' => 'Formato no válido. Usa imagen (jpg, png, webp) o PDF.']); return;
     }
-    $ext  = $m[1] === 'jpeg' ? 'jpg' : $m[1];
-    $data = base64_decode($m[2]);
-    if ($data === false) { responder(400, ['error' => 'No se pudo procesar la imagen.']); return; }
-    if (strlen($data) > 8 * 1024 * 1024) { responder(400, ['error' => 'La imagen supera el tamaño máximo (8MB).']); return; }
+    if ($data === false) { responder(400, ['error' => 'No se pudo procesar el archivo.']); return; }
+    if (strlen($data) > 15 * 1024 * 1024) { responder(400, ['error' => 'El archivo supera el tamaño máximo (15MB).']); return; }
 
     $dir = __DIR__ . "/../assets/uploads/ordenes/{$ordenId}";
     if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
@@ -258,7 +252,7 @@ function subirFoto(array $sesion): void {
     }
     $archivo = uniqid('ot_' . $ordenId . '_') . '.' . $ext;
     if (file_put_contents("$dir/$archivo", $data) === false) {
-        responder(500, ['error' => 'No se pudo guardar la imagen en el servidor.']); return;
+        responder(500, ['error' => 'No se pudo guardar el archivo en el servidor.']); return;
     }
 
     $rutaRelativa = "assets/uploads/ordenes/{$ordenId}/{$archivo}";

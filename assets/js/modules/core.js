@@ -58,6 +58,8 @@ function marcarGrupoActivo(modulo) {
 }
 let materialRapidoCallback = false;
 let materialRapidoNombre   = '';
+let vehiculoRapidoCallback  = false;
+let vehiculoRapidoClienteId = null;
 let currentCotId           = null;
 
 // ── AUTH ─────────────────────────────────────────────────────
@@ -296,3 +298,36 @@ function badgeEstado(e) {
   return `<span class="badge ${map[e]||'badge-gray'}">${e.replace('_',' ')}</span>`;
 }
 
+// ── TIPOS DE VEHÍCULO (catálogo compartido: Vehículos + OT) ───
+let tiposVehiculoCache = [];
+async function cargarTiposVehiculoCache(forzar = false) {
+  if (tiposVehiculoCache.length && !forzar) return;
+  try {
+    const r = await api('controllers/VehiculosController.php?action=tipos');
+    if (r.ok && r.data.data) tiposVehiculoCache = r.data.data;
+  } catch(e) { tiposVehiculoCache = []; }
+}
+function llenarSelectTipoVehiculo(selectEl, valorActual = '') {
+  if (!selectEl) return;
+  selectEl.innerHTML = '<option value="">— Seleccionar —</option>' +
+    tiposVehiculoCache.map(t => `<option value="${t.nombre}" ${t.nombre === valorActual ? 'selected' : ''}>${t.nombre}</option>`).join('');
+  // Si el valor guardado no está en el catálogo (dato viejo), agregarlo para no perderlo
+  if (valorActual && !tiposVehiculoCache.some(t => t.nombre === valorActual)) {
+    selectEl.innerHTML += `<option value="${valorActual}" selected>${valorActual}</option>`;
+  }
+}
+
+
+
+
+// ── CAI: validar fecha límite y rango antes de facturar ──────
+// Devuelve { ok:true } o { ok:false, error:'mensaje claro' }
+async function validarCAIParaFacturar() {
+  try {
+    const r = await api('controllers/FacturacionController.php?action=cai_validar');
+    if (r.ok) return { ok: true, cai: r.data.data };
+    return { ok: false, error: r.data?.error || 'No se puede facturar: el CAI no es válido.' };
+  } catch (e) {
+    return { ok: false, error: 'No se pudo verificar el CAI.' };
+  }
+}

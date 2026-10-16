@@ -15,6 +15,8 @@
           <option value="2025">2025</option><option value="2026">2026</option><option value="2027">2027</option>
         </select>
         <button class="btn btn-primary" onclick="cargarLibroVentas()">🔍 Consultar</button>
+        <button class="btn btn-secondary" onclick="exportarLibroVentasPDF()">📄 PDF</button>
+        <button class="btn btn-secondary" onclick="exportarLibroVentasExcel()">📊 Excel</button>
       </div>
     </div>
     <div id="libroResumen" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:14px 18px;margin-bottom:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">

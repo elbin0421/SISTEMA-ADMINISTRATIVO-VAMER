@@ -22,15 +22,23 @@
     <div class="form-row">
       <div class="form-group">
         <label>Vehículo registrado <span style="color:var(--muted);font-size:11px">(selecciona o llena manualmente)</span></label>
-        <select id="otVehiculoSelect" onchange="autoLlenarVehiculoOT()" style="width:100%;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px">
-          <option value="">— Seleccionar vehículo del cliente —</option>
-        </select>
+        <div style="display:flex;gap:8px">
+          <select id="otVehiculoSelect" onchange="autoLlenarVehiculoOT()" style="flex:1;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px">
+            <option value="">— Seleccionar vehículo del cliente —</option>
+          </select>
+          <button type="button" class="btn btn-secondary" style="white-space:nowrap" onclick="abrirNuevoVehiculoDesdeOT()">+ Nuevo Vehículo</button>
+        </div>
       </div>
     </div>
     <div class="form-row-3">
-      <div class="form-group"><label>Placa</label><input type="text" id="otPlaca" placeholder="AAA-0000"></div>
-      <div class="form-group"><label>Marca</label><input type="text" id="otMarca" placeholder="Toyota, Ford..."></div>
-      <div class="form-group"><label>Modelo</label><input type="text" id="otModelo" placeholder="Hilux, F-150..."></div>
+      <div class="form-group"><label>Unidad</label><input type="text" id="otPlaca" placeholder="Ej: U-12, Pipa 14..."></div>
+      <div class="form-group"><label>Placa</label><input type="text" id="otMarca" placeholder="AAA-0000"></div>
+      <div class="form-group">
+        <label>Tipo Vehículo</label>
+        <select id="otModelo">
+          <option value="">— Seleccionar —</option>
+        </select>
+      </div>
     </div>
     <div class="form-row-3">
       <div class="form-group"><label>Año</label><input type="number" id="otAnio" placeholder="2020" min="1900" max="2099"></div>
@@ -43,8 +51,8 @@
     </div>
     <div class="section-title">📸 Fotos de recepción y entrega del equipo</div>
     <div class="form-group">
-      <input type="file" id="otFotosInput" accept="image/*" multiple onchange="onSeleccionarFotosOT(this)">
-      <div style="font-size:11px;color:var(--muted);margin-top:4px">Fotografía el estado en que se recibió el equipo (rayones, golpes, faltantes, etc.). Puedes seleccionar varias a la vez.</div>
+      <input type="file" id="otFotosInput" accept="image/*,application/pdf" multiple onchange="onSeleccionarFotosOT(this)">
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">Fotografía el estado en que se recibió el equipo (rayones, golpes, faltantes, etc.) o adjunta un PDF. Puedes seleccionar varios archivos a la vez.</div>
       <div id="otFotosGrid" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px"></div>
     </div>
     <div class="section-title">🔧 Trabajo</div>
@@ -66,6 +74,10 @@
 <div class="modal-bg" id="modalDetalleOT">
   <div class="modal modal-lg">
     <div id="contenidoDetalleOT"><p class="loading">Cargando...</p></div>
-    <div class="modal-footer"><button class="btn btn-secondary" onclick="cerrarModal('modalDetalleOT')">Cerrar</button></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="pdfOTTrabajo()">📄 PDF Trabajo</button>
+      <button class="btn btn-secondary" onclick="pdfOTMateriales()">📄 PDF Materiales</button>
+      <button class="btn btn-secondary" onclick="cerrarModal('modalDetalleOT')">Cerrar</button>
+    </div>
   </div>
 </div>

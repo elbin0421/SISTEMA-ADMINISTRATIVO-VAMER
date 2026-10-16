@@ -114,8 +114,7 @@ class FacturacionService {
         }
 
         // Obtener CAI activo
-        $cai = FacturaModel::obtenerCAIActivo();
-        if (!$cai) throw new Exception('No hay CAI activo.');
+        $cai = FacturaModel::obtenerCAIParaEmitir();
 
         // Usar correlativo_actual directamente (ya es el número a emitir)
         $numero = $cai['correlativo_actual'];

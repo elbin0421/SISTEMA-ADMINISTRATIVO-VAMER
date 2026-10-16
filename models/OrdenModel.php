@@ -56,9 +56,10 @@ class OrdenModel {
         $s = $pdo->prepare("
             SELECT d.id_detalle_om, d.material_id, d.cantidad,
                    d.precio_unitario, d.subtotal,
-                   m.nombre AS material, m.unidad_medida
+                   COALESCE(m.nombre, d.descripcion)          AS material,
+                   COALESCE(m.unidad_medida, d.unidad_medida) AS unidad_medida
             FROM detalle_orden_materiales d
-            JOIN materiales m ON m.id_material = d.material_id
+            LEFT JOIN materiales m ON m.id_material = d.material_id
             WHERE d.orden_id = ?
         ");
         $s->execute([$id]);
@@ -94,12 +95,15 @@ class OrdenModel {
 
     public static function tecnicos(): array {
         $stmt = getDB()->prepare(
-            "SELECT id_empleado,
-                    CONCAT(nombres, ' ', apellidos) AS nombre,
-                    puesto, salario_mensual
-             FROM empleados
-             WHERE estado = 'activo' AND (ubicacion = 'SOLDYMEG' OR ubicacion IS NULL)
-             ORDER BY apellidos, nombres"
+            "SELECT e.id_empleado,
+                    CONCAT(e.nombres, ' ', e.apellidos) AS nombre,
+                    e.puesto, e.salario_mensual
+             FROM empleados e
+             LEFT JOIN departamentos d ON d.id_departamento = e.departamento_id
+             WHERE e.estado = 'activo'
+               AND (e.ubicacion = 'SOLDYMEG' OR e.ubicacion IS NULL)
+               AND (d.nombre IS NULL OR LOWER(d.nombre) NOT IN ('administración','administracion','motoristas','motorista','operaciones'))
+             ORDER BY e.apellidos, e.nombres"
         );
         $stmt->execute();
         return $stmt->fetchAll();

@@ -48,10 +48,10 @@ function kpisDashboard(): void {
         ORDER BY c.fecha DESC, c.id_cotizacion DESC LIMIT 5");
     $cotizaciones = $s->fetchAll();
 
-    // OT recientes (6)
+    // OT recientes (5)
     $s = $pdo->query("SELECT ot.numero_orden,ot.fecha_apertura,ot.estado,cl.nombre AS cliente,ot.marca,ot.modelo,ot.placa
         FROM ordenes_trabajo ot JOIN clientes cl ON cl.id_cliente=ot.cliente_id
-        WHERE ot.estado!='anulada' ORDER BY ot.fecha_apertura DESC, ot.id_orden DESC LIMIT 6");
+        WHERE ot.estado!='anulada' ORDER BY ot.fecha_apertura DESC, ot.id_orden DESC LIMIT 5");
     $otRecientes = $s->fetchAll();
 
     responder(200, ['ok'=>true,'data'=>[

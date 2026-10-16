@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-//  SOLDYMEG — ReportesController  (Fase 5 — Rev.2)
+//  VAMER — ReportesController  (Fase 5 — Rev.2)
 // ============================================================
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/auth.php';
@@ -101,7 +101,7 @@ function planillaPDF(array $sesion): void {
     $cols=$mostrarSeguro?12:11;
     echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>'.htmlspecialchars($titulo).'</title>';
     echo '<style>body{font-family:Arial,sans-serif;font-size:10px;margin:15px;color:#222}h2{text-align:center;font-size:13px;margin-bottom:3px}.sub{text-align:center;color:#555;font-size:10px;margin-bottom:12px}table{width:100%;border-collapse:collapse;margin-bottom:12px}th{background:#1a1a2e;color:#fff;padding:5px 3px;text-align:center;font-size:9px}td{border:1px solid #ddd;padding:4px 3px;text-align:right;font-size:9px}td.l{text-align:left}tr:nth-child(even){background:#f5f5f5}.tot{background:#e8f4e8;font-weight:bold}.boxes{text-align:center;margin-bottom:12px}.box{display:inline-block;border:1px solid #ccc;border-radius:5px;padding:6px 12px;margin:3px;text-align:center}.box strong{display:block;font-size:12px}@media print{body{margin:8px}}</style></head><body>';
-    echo '<h2>SOLDYMEG - '.htmlspecialchars($titulo).'</h2>';
+    echo '<h2>VAMER - '.htmlspecialchars($titulo).'</h2>';
     echo '<div class="sub">Fecha de pago: '.$p['fecha_pago'].' | Estado: '.strtoupper($p['estado']).'</div>';
     echo '<div class="boxes">'
         .'<div class="box">Empleados<strong>'.count($p['detalle']).'</strong></div>'
@@ -111,7 +111,7 @@ function planillaPDF(array $sesion): void {
         .'</div>';
     echo '<table><thead><tr><th>Empleado</th><th>Ubic.</th><th>Sal.Quincenal</th><th>H.Extra</th><th>Mto.HE</th><th style="color:#e8a020">Viáticos</th><th>D.Falt.</th><th>Desc.Falt.</th>';
     if($mostrarSeguro) echo '<th>Seguro</th>';
-    echo '<th>Abo.Prest.</th><th>Abo.Vale</th><th>Total Ded.</th><th>NETO</th></tr></thead><tbody>';
+    echo '<th>Abo.Prest.</th><th>Vale</th><th>Total Ded.</th><th>NETO</th></tr></thead><tbody>';
     $totalViaticosPlanilla = 0;
     foreach($p['detalle'] as $d){
         $viaticoFila = (float)($d['viatico_s1']??0)+(float)($d['viatico_s2']??0)+(float)($d['viatico_s3']??0)+(float)($d['viatico_s4']??0);
@@ -138,7 +138,7 @@ function planillaPDF(array $sesion): void {
     echo '<td colspan="2">—</td><td>'.$f($p['total_deducciones']).'</td><td>'.$f($p['total_neto']).'</td></tr>';
     echo '</tbody></table>';
     if(!empty($p['observaciones'])) echo '<p><strong>Observaciones:</strong> '.htmlspecialchars($p['observaciones']).'</p>';
-    echo '<p style="color:#888;font-size:9px;margin-top:20px">Generado: '.date('d/m/Y H:i').' | SOLDYMEG Sistema Administrativo</p>';
+    echo '<p style="color:#888;font-size:9px;margin-top:20px">Generado: '.date('d/m/Y H:i').' | VAMER Sistema Administrativo</p>';
     echo '<script>window.onload=()=>window.print();</script></body></html>';
     exit;
 }
@@ -305,7 +305,7 @@ function planillaExcel(array $sesion): void {
     header('Content-Disposition: attachment; filename="'.$filename.'"');
     echo "\xEF\xBB\xBF";
     $out=fopen('php://output','w');
-    fputcsv($out,["SOLDYMEG - Planilla {$quincena} Quincena - {$mes} {$p['periodo_anio']}"]);
+    fputcsv($out,["VAMER - Planilla {$quincena} Quincena - {$mes} {$p['periodo_anio']}"]);
     fputcsv($out,['Fecha pago: '.$p['fecha_pago'],'Estado: '.$p['estado']]);
     fputcsv($out,[]);
     $cab=['Empleado','Puesto','Ubicacion','Sal. Quincenal','Horas Extra','Monto HE','Viaticos','Dias Faltados','Desc. Faltados'];

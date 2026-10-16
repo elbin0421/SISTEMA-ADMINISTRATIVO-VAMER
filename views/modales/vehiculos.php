@@ -19,16 +19,18 @@
     <div class="section-title">🚗 Datos del Vehículo</div>
     <div class="form-row-3">
       <div class="form-group">
-        <label>Placa *</label>
-        <input type="text" id="vPlaca" placeholder="AAA-0000" style="text-transform:uppercase">
+        <label>Unidad *</label>
+        <input type="text" id="vPlaca" placeholder="Ej: U-12, Pipa 14..." style="text-transform:uppercase">
       </div>
       <div class="form-group">
-        <label>Marca</label>
-        <input type="text" id="vMarca" placeholder="Toyota, Ford, Kenworth...">
+        <label>Placa</label>
+        <input type="text" id="vMarca" placeholder="AAA-0000" style="text-transform:uppercase">
       </div>
       <div class="form-group">
-        <label>Modelo</label>
-        <input type="text" id="vModelo" placeholder="Hilux, F-150, T800...">
+        <label>Tipo Vehículo</label>
+        <select id="vModelo">
+          <option value="">— Seleccionar —</option>
+        </select>
       </div>
     </div>
     <div class="form-row-3">

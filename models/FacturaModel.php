@@ -94,8 +94,7 @@ class FacturaModel {
         }
 
         // Obtener CAI activo
-        $cai = self::obtenerCAIActivo();
-        if (!$cai) throw new Exception('No hay CAI activo. Configure el CAI en el sistema.');
+        $cai = self::obtenerCAIParaEmitir();
 
         // Generar número de factura correlativo
         $numero = self::generarCorrelativo($cai);
@@ -268,6 +267,61 @@ class FacturaModel {
     }
 
     /**
+     * Número secuencial (última parte) de un correlativo SAR: 001-001-01-00000034 → 34
+     */
+    public static function secuenciaCorrelativo(string $correlativo): int {
+        $partes = explode('-', trim($correlativo));
+        return (int)end($partes);
+    }
+
+    /**
+     * CAI listo para EMITIR una factura. Valida, en este orden:
+     *   1. Que exista un CAI activo.
+     *   2. Que la fecha actual NO sea mayor a la fecha límite de emisión.
+     *   3. Que el correlativo actual NO sea mayor al rango final autorizado.
+     * Lanza Exception con un mensaje claro si algo falla.
+     */
+    public static function obtenerCAIParaEmitir(): array {
+        $pdo = getDB();
+        $hoy = (string)$pdo->query("SELECT CURDATE()")->fetchColumn();
+
+        $stmt = $pdo->prepare("SELECT * FROM cai_facturacion WHERE estado='activo' ORDER BY id_cai DESC LIMIT 1");
+        $stmt->execute();
+        $cai = $stmt->fetch();
+
+        if (!$cai) {
+            // Explicar por qué no hay uno activo, usando el más reciente
+            $ult = $pdo->query("SELECT * FROM cai_facturacion ORDER BY id_cai DESC LIMIT 1")->fetch();
+            if (!$ult) {
+                throw new Exception('No hay CAI configurado. Registre un CAI antes de facturar.');
+            }
+            $fLim = date('d/m/Y', strtotime($ult['fecha_limite_emision']));
+            if ($ult['estado'] === 'agotado') {
+                throw new Exception("El rango autorizado del CAI {$ult['cai']} está agotado (rango final: {$ult['rango_fin']}). Registre un nuevo CAI para seguir facturando.");
+            }
+            if ($ult['fecha_limite_emision'] < $hoy) {
+                throw new Exception("El CAI {$ult['cai']} venció: la fecha límite de emisión era el $fLim. Registre un nuevo CAI para seguir facturando.");
+            }
+            throw new Exception('No hay CAI activo. Registre o reactive un CAI antes de facturar.');
+        }
+
+        // 2. Fecha actual no puede ser mayor a la fecha límite de emisión
+        if ($hoy > $cai['fecha_limite_emision']) {
+            $pdo->prepare("UPDATE cai_facturacion SET estado='vencido' WHERE id_cai=?")->execute([$cai['id_cai']]);
+            $fLim = date('d/m/Y', strtotime($cai['fecha_limite_emision']));
+            throw new Exception("La fecha límite de emisión del CAI {$cai['cai']} era el $fLim y ya pasó. No se pueden emitir más facturas con este CAI; registre uno nuevo.");
+        }
+
+        // 3. Correlativo actual no puede ser mayor al rango final
+        if (self::secuenciaCorrelativo($cai['correlativo_actual']) > self::secuenciaCorrelativo($cai['rango_fin'])) {
+            $pdo->prepare("UPDATE cai_facturacion SET estado='agotado' WHERE id_cai=?")->execute([$cai['id_cai']]);
+            throw new Exception("Se agotó el rango autorizado del CAI {$cai['cai']}: el correlativo {$cai['correlativo_actual']} supera el rango final {$cai['rango_fin']}. Registre un nuevo CAI para seguir facturando.");
+        }
+
+        return $cai;
+    }
+
+    /**
      * Para el módulo CAI: devuelve el CAI activo (sin importar fecha)
      * con flag fecha_vencida para mostrar advertencia visual.
      */
@@ -355,8 +409,7 @@ class FacturaModel {
         if (empty($items)) throw new Exception('Debe incluir al menos un ítem.');
 
         // Obtener CAI activo
-        $cai = self::obtenerCAIActivo();
-        if (!$cai) throw new Exception('No hay CAI activo. Configure el CAI en el sistema.');
+        $cai = self::obtenerCAIParaEmitir();
 
         // Calcular totales desde los ítems
         $subtotal = 0.0;
@@ -474,10 +527,12 @@ class FacturaModel {
                 f.isv,
                 f.total,
                 f.metodo_pago,
+                cai.cai         AS cai_codigo,
                 cot.numero_cotizacion,
                 ot.numero_orden
             FROM facturas f
             JOIN clientes cl ON cl.id_cliente = f.cliente_id
+            LEFT JOIN cai_facturacion cai ON cai.id_cai       = f.cai_id
             LEFT JOIN cotizaciones cot   ON cot.id_cotizacion = f.cotizacion_id
             LEFT JOIN ordenes_trabajo ot ON ot.id_orden       = f.orden_id
             WHERE MONTH(f.fecha) = ? AND YEAR(f.fecha) = ?

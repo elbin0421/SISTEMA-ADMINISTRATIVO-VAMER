@@ -50,7 +50,7 @@ function renderTablaOrdenes(rows) {
   let h = '<table><thead><tr><th>OT</th><th>Cliente</th><th>Vehículo</th><th>Técnicos</th><th>Apertura</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>';
   if (!pag.slice.length) h += '<tr><td colspan="7" class="empty-state">Sin órdenes</td></tr>';
   pag.slice.forEach(o => {
-    const veh = [o.marca, o.modelo, o.placa ? '('+o.placa+')' : ''].filter(Boolean).join(' ') || '—';
+    const veh = [o.placa ? 'Unidad '+o.placa : '', o.modelo, o.marca ? '('+o.marca+')' : ''].filter(Boolean).join(' ') || '—';
     h += `<tr>
       <td><strong>${o.numero_orden}</strong></td>
       <td>${o.cliente}</td><td>${veh}</td>
@@ -122,7 +122,7 @@ async function abrirModalOT() {
   document.getElementById('otId').value='';
   lineasTrabajo = [];
   renderLineasTrabajo();
-  ['otPlaca','otMarca','otModelo','otColor','otMotor','otChasis','otObs','otClienteBuscar'].forEach(id => document.getElementById(id).value='');
+  ['otPlaca','otMarca','otColor','otMotor','otChasis','otObs','otClienteBuscar'].forEach(id => document.getElementById(id).value='');
   ['otAnio','otKm'].forEach(id => document.getElementById(id).value='');
   document.getElementById('otClienteId').value='';
   document.getElementById('otFecha').value = new Date().toISOString().slice(0,10);
@@ -135,6 +135,8 @@ async function abrirModalOT() {
   renderFotosOT();
   const selVeh = document.getElementById('otVehiculoSelect');
   if (selVeh) selVeh.innerHTML = '<option value="">— Seleccionar vehículo del cliente —</option>';
+  await cargarTiposVehiculoCache();
+  llenarSelectTipoVehiculo(document.getElementById('otModelo'), '');
   renderCheckboxesTecnicos(document.getElementById('otTecnicosWrap'), []);
   abrirModal('modalOT');
 }
@@ -150,7 +152,8 @@ async function editarOT(id) {
   document.getElementById('otFecha').value=o.fecha_apertura;
   document.getElementById('otPlaca').value=o.placa||'';
   document.getElementById('otMarca').value=o.marca||'';
-  document.getElementById('otModelo').value=o.modelo||'';
+  await cargarTiposVehiculoCache();
+  llenarSelectTipoVehiculo(document.getElementById('otModelo'), o.modelo||'');
   document.getElementById('otAnio').value=o.anio||'';
   document.getElementById('otColor').value=o.color||'';
   document.getElementById('otKm').value=o.kilometraje||'';
@@ -206,7 +209,7 @@ async function cargarVehiculosOT(clienteId) {
     sel.innerHTML = '<option value="">— Seleccionar vehículo del cliente —</option>';
     if (r.ok && r.data.data.length) {
       r.data.data.forEach(v => {
-        const label = `${v.placa}${v.marca ? ' — ' + v.marca : ''}${v.modelo ? ' ' + v.modelo : ''}${v.anio ? ' ' + v.anio : ''}`;
+        const label = `Unidad ${v.placa}${v.marca ? ' — Placa ' + v.marca : ''}${v.modelo ? ' — ' + v.modelo : ''}${v.anio ? ' ' + v.anio : ''}`;
         sel.innerHTML += `<option value="${v.id_vehiculo}" data-placa="${v.placa}" data-marca="${v.marca||''}" data-modelo="${v.modelo||''}" data-anio="${v.anio||''}" data-color="${v.color||''}" data-motor="${v.numero_motor||''}" data-chasis="${v.numero_chasis||''}">${label}</option>`;
       });
     } else {
@@ -223,11 +226,23 @@ function autoLlenarVehiculoOT() {
   if (!opt || !opt.value) return;
   document.getElementById('otPlaca').value   = opt.dataset.placa  || '';
   document.getElementById('otMarca').value   = opt.dataset.marca  || '';
-  document.getElementById('otModelo').value  = opt.dataset.modelo || '';
+  llenarSelectTipoVehiculo(document.getElementById('otModelo'), opt.dataset.modelo || '');
   document.getElementById('otAnio').value    = opt.dataset.anio   || '';
   document.getElementById('otColor').value   = opt.dataset.color  || '';
   document.getElementById('otMotor').value   = opt.dataset.motor  || '';
   document.getElementById('otChasis').value  = opt.dataset.chasis || '';
+}
+
+async function abrirNuevoVehiculoDesdeOT() {
+  const clienteId     = +document.getElementById('otClienteId').value;
+  const clienteNombre = document.getElementById('otClienteBuscar').value.trim();
+  if (!clienteId) { toast('Selecciona primero el cliente de la OT.', 'warn'); return; }
+  vehiculoRapidoCallback  = true;
+  vehiculoRapidoClienteId = clienteId;
+  await abrirModalVehiculo();
+  document.getElementById('vClienteId').value     = clienteId;
+  document.getElementById('vClienteBuscar').value = clienteNombre;
+  document.getElementById('modalVehiculo').classList.add('sobre-modal');
 }
 
 async function guardarOT() {
@@ -293,18 +308,34 @@ function comprimirImagenOT(file, maxDim = 1600, calidad = 0.75) {
   });
 }
 
+function leerArchivoComoDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload  = e => resolve(e.target.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function esArchivoPDF(archivo) {
+  if (typeof archivo !== 'string') return false;
+  return archivo.startsWith('data:application/pdf') || /\.pdf($|\?)/i.test(archivo);
+}
+
 async function onSeleccionarFotosOT(input) {
   const files = Array.from(input.files || []);
   if (!files.length) return;
   const idOT = document.getElementById('otId').value;
 
   for (const file of files) {
-    if (!file.type.startsWith('image/')) continue;
+    const esImagen = file.type.startsWith('image/');
+    const esPDF    = file.type === 'application/pdf';
+    if (!esImagen && !esPDF) continue;
     try {
-      const dataUrl = await comprimirImagenOT(file);
+      const dataUrl = esImagen ? await comprimirImagenOT(file) : await leerArchivoComoDataURL(file);
       if (idOT) await subirFotoOT(idOT, dataUrl, file.name);
       else fotosOTPendientes.push({ dataUrl, nombre: file.name });
-    } catch (e) { toast('No se pudo procesar una de las fotos.', 'error'); }
+    } catch (e) { toast('No se pudo procesar uno de los archivos.', 'error'); }
   }
   input.value = '';
   renderFotosOT();
@@ -316,7 +347,17 @@ async function subirFotoOT(ordenId, dataUrl, nombre) {
     body: JSON.stringify({ orden_id: ordenId, imagen_base64: dataUrl, nombre_original: nombre }),
   });
   if (r.ok) fotosOTExistentes.push(r.data.foto);
-  else toast(r.data?.error || 'Error al subir foto.', 'error');
+  else toast(r.data?.error || 'Error al subir archivo.', 'error');
+}
+
+function previewArchivoOT(src, nombre) {
+  if (esArchivoPDF(src)) {
+    return `<a href="${src}" target="_blank" style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;height:100%;border-radius:6px;border:1px solid var(--border);background:var(--bg);text-decoration:none;color:var(--text);font-size:9px;padding:4px;box-sizing:border-box;overflow:hidden;text-align:center">
+      <span style="font-size:26px">📄</span>
+      <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%">${nombre || 'PDF'}</span>
+    </a>`;
+  }
+  return `<img src="${src}" style="width:100%;height:100%;object-fit:cover;border-radius:6px;border:1px solid var(--border);cursor:pointer" onclick="window.open('${src}','_blank')">`;
 }
 
 function renderFotosOT() {
@@ -324,18 +365,18 @@ function renderFotosOT() {
   if (!grid) return;
   const existentesHtml = fotosOTExistentes.map(f => `
     <div style="position:relative;width:90px;height:90px">
-      <img src="${f.ruta}" style="width:100%;height:100%;object-fit:cover;border-radius:6px;border:1px solid var(--border);cursor:pointer" onclick="window.open('${f.ruta}','_blank')">
+      ${previewArchivoOT(f.ruta, f.nombre_original)}
       <button type="button" onclick="eliminarFotoOT(${f.id_foto})" title="Eliminar"
         style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:var(--danger);color:#fff;border:none;cursor:pointer;font-size:11px;line-height:1">✕</button>
     </div>`).join('');
   const pendientesHtml = fotosOTPendientes.map((f, i) => `
     <div style="position:relative;width:90px;height:90px">
-      <img src="${f.dataUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:6px;border:1px solid var(--border);opacity:.85">
+      <div style="width:100%;height:100%;opacity:.85">${previewArchivoOT(f.dataUrl, f.nombre)}</div>
       <span style="position:absolute;bottom:2px;left:2px;background:rgba(0,0,0,.6);color:#fff;font-size:9px;padding:1px 4px;border-radius:3px">Pendiente</span>
       <button type="button" onclick="quitarFotoPendienteOT(${i})" title="Quitar"
         style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:var(--danger);color:#fff;border:none;cursor:pointer;font-size:11px;line-height:1">✕</button>
     </div>`).join('');
-  grid.innerHTML = (existentesHtml + pendientesHtml) || '<p style="color:var(--muted);font-size:12px;margin:0">Sin fotos aún.</p>';
+  grid.innerHTML = (existentesHtml + pendientesHtml) || '<p style="color:var(--muted);font-size:12px;margin:0">Sin archivos aún.</p>';
 }
 
 function quitarFotoPendienteOT(i) {
@@ -355,13 +396,14 @@ async function eliminarFotoOT(idFoto) {
   } else toast(r.data?.error || 'Error.', 'error');
 }
 
+let otDetalleActual = null;
+
 async function verDetalleOT(id) {
   document.getElementById('contenidoDetalleOT').innerHTML='<p class="loading">Cargando...</p>';
   abrirModal('modalDetalleOT');
   const r = await api('controllers/OrdenesController.php?action=obtener&id='+id);
   if (!r.ok) { document.getElementById('contenidoDetalleOT').innerHTML='<p style="color:var(--danger)">Error.</p>'; return; }
   const o = r.data.data;
-  const veh = [o.anio, o.marca, o.modelo, o.color].filter(Boolean).join(' ');
 
   let h = `<h4>🔧 ${o.numero_orden} ${badgeEstado(o.estado)}</h4>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;font-size:13px">
@@ -371,11 +413,13 @@ async function verDetalleOT(id) {
     <div><span style="color:var(--muted)">Cierre:</span> ${o.fecha_cierre||'—'}</div>
   </div>`;
 
-  if (veh) {
+  if (o.placa || o.marca || o.modelo || o.color) {
     h += `<div class="section-title">🚗 Vehículo</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:14px;font-size:13px">
-      ${o.placa ? `<div><span style="color:var(--muted)">Placa:</span> <strong>${o.placa}</strong></div>` : ''}
-      ${veh ? `<div><span style="color:var(--muted)">Vehículo:</span> ${veh}</div>` : ''}
+      ${o.placa ? `<div><span style="color:var(--muted)">Unidad:</span> <strong>${o.placa}</strong></div>` : ''}
+      ${o.marca ? `<div><span style="color:var(--muted)">Placa:</span> <strong>${o.marca}</strong></div>` : ''}
+      ${o.modelo ? `<div><span style="color:var(--muted)">Tipo:</span> ${o.modelo}</div>` : ''}
+      ${o.color ? `<div><span style="color:var(--muted)">Color:</span> ${o.color}</div>` : ''}
       ${o.kilometraje ? `<div><span style="color:var(--muted)">Km:</span> ${o.kilometraje.toLocaleString()}</div>` : ''}
       ${o.numero_motor ? `<div><span style="color:var(--muted)">Motor:</span> ${o.numero_motor}</div>` : ''}
       ${o.numero_chasis ? `<div><span style="color:var(--muted)">Chasis:</span> ${o.numero_chasis}</div>` : ''}
@@ -385,7 +429,7 @@ async function verDetalleOT(id) {
   if (o.fotos && o.fotos.length) {
     h += `<div class="section-title">📸 Fotos de recepción</div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">
-      ${o.fotos.map(f => `<img src="${f.ruta}" style="width:90px;height:90px;object-fit:cover;border-radius:6px;border:1px solid var(--border);cursor:pointer" onclick="window.open('${f.ruta}','_blank')">`).join('')}
+      ${o.fotos.map(f => `<div style="width:90px;height:90px">${previewArchivoOT(f.ruta, f.nombre_original)}</div>`).join('')}
     </div>`;
   }
 
@@ -398,8 +442,9 @@ async function verDetalleOT(id) {
   // Materiales
   h += `<div class="section-title">📦 Materiales utilizados</div>`;
   if (o.estado === 'borrador' || o.estado === 'en_proceso') {
-    h += `<div style="display:grid;grid-template-columns:1fr 80px 90px auto;gap:6px;align-items:end;margin-bottom:8px">
-      <input type="text" id="otDetMatBuscar" placeholder="Buscar material..." oninput="buscarMatOT()" style="padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;outline:none">
+    h += `<p style="font-size:11px;color:var(--muted);margin-bottom:6px">Elige un material del inventario o escribe uno nuevo — no se descuenta del stock, es solo una lista de referencia.</p>
+    <div style="display:grid;grid-template-columns:1fr 80px 90px auto;gap:6px;align-items:end;margin-bottom:8px">
+      <input type="text" id="otDetMatBuscar" placeholder="Material (busca o escribe uno nuevo)..." oninput="buscarMatOT()" style="padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;outline:none">
       <input type="number" id="otDetCant" placeholder="Cant." min="0.01" step="0.01" style="padding:7px 8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;outline:none">
       <input type="number" id="otDetPrecio" placeholder="Precio" min="0" step="0.01" style="padding:7px 8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;outline:none">
       <button class="btn btn-sm btn-success" onclick="agregarMatOT(${o.id_orden})">+ Agregar</button>
@@ -501,6 +546,7 @@ async function verDetalleOT(id) {
 
   document.getElementById('contenidoDetalleOT').innerHTML = h;
   currentOTId = o.id_orden;
+  otDetalleActual = o;
 
   // Mostrar/ocultar botón "Generar Cotización" según estado de la OT
   let btnCot = document.getElementById('btnCotizarOT');
@@ -520,6 +566,7 @@ let buscarMatOTTimer = null;
 
 async function buscarMatOT() {
   clearTimeout(buscarMatOTTimer);
+  const idHid = document.getElementById('otDetMatId'); if (idHid) idHid.value = '';
   const q = document.getElementById('otDetMatBuscar')?.value.trim();
   if (!q || q.length < 2) { document.getElementById('sugerenciasMatOT').style.display='none'; return; }
   buscarMatOTTimer = setTimeout(async () => {
@@ -545,17 +592,21 @@ function selMatOT(id, nombre, precio) {
 }
 
 async function agregarMatOT(ordenId) {
-  const matId  = +document.getElementById('otDetMatId').value;
+  const matId  = +document.getElementById('otDetMatId').value || 0;
+  const desc   = document.getElementById('otDetMatBuscar').value.trim();
   const cant   = parseFloat(document.getElementById('otDetCant').value);
-  const precio = parseFloat(document.getElementById('otDetPrecio').value);
-  if (!matId || isNaN(cant)||cant<=0) { toast('Selecciona material y cantidad.','warn'); return; }
-  const r = await api('controllers/OrdenesController.php?action=agregar_material', { method:'POST', body:JSON.stringify({orden_id:ordenId, material_id:matId, cantidad:cant, precio_unitario:precio}) });
+  const precio = parseFloat(document.getElementById('otDetPrecio').value) || 0;
+  if (!desc || isNaN(cant) || cant <= 0) { toast('Escribe el material y la cantidad.', 'warn'); return; }
+  const r = await api('controllers/OrdenesController.php?action=agregar_material', {
+    method: 'POST',
+    body: JSON.stringify({ orden_id: ordenId, material_id: matId || null, descripcion: desc, cantidad: cant, precio_unitario: precio })
+  });
   if (r.ok) { toast('Material agregado.','success'); verDetalleOT(ordenId); }
   else toast(r.data.error||'Error.','error');
 }
 
 async function quitarMatOT(detalleId, ordenId) {
-  if (!await confirmDialog('¿Quitar este material de la OT? El stock será devuelto.')) return;
+  if (!await confirmDialog('¿Quitar este material de la lista de la OT?')) return;
   const r = await api('controllers/OrdenesController.php?action=quitar_material', { method:'POST', body:JSON.stringify({id:detalleId}) });
   if (r.ok) { toast('Material removido.','success'); verDetalleOT(ordenId); }
   else toast(r.data.error||'Error.','error');
@@ -614,3 +665,77 @@ async function cambiarEstadoOT(id, estado) {
   else toast(r.data.error||'Error.','error');
 }
 
+
+
+// ── PDFs de la OT (Trabajo / Materiales) ─────────────────────
+function escOT(t) {
+  return String(t ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function abrirPDFOT(o, tituloSeccion, cuerpoHtml) {
+  const tecnicos = (o.tecnicos && o.tecnicos.length)
+    ? o.tecnicos.map(t => escOT(t.nombre) + (t.puesto ? ` (${escOT(t.puesto)})` : '')).join(', ')
+    : 'Sin asignar';
+  const vehiculo = (o.placa || o.marca || o.modelo)
+    ? `<h3>🚗 Vehículo</h3>
+       <table class="info">
+         ${o.placa  ? `<tr><td class="k">Unidad:</td><td>${escOT(o.placa)}</td></tr>`  : ''}
+         ${o.marca  ? `<tr><td class="k">Placa:</td><td>${escOT(o.marca)}</td></tr>`   : ''}
+         ${o.modelo ? `<tr><td class="k">Tipo:</td><td>${escOT(o.modelo)}</td></tr>`   : ''}
+       </table>` : '';
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>${escOT(o.numero_orden)} — ${tituloSeccion}</title>
+  <style>
+    body{font-family:Arial,sans-serif;font-size:13px;color:#111;padding:28px 34px}
+    h2{margin:0 0 14px;font-size:20px}
+    h3{margin:18px 0 6px;font-size:14px;border-bottom:1px solid #ccc;padding-bottom:4px}
+    .estado{font-size:12px;font-weight:400;color:#555;margin-left:6px}
+    table.info td{padding:2px 8px 2px 0;vertical-align:top}
+    table.info td.k{color:#555;white-space:nowrap}
+    table.lista{width:100%;border-collapse:collapse;margin-top:6px}
+    table.lista th,table.lista td{border:1px solid #bbb;padding:6px 8px;text-align:left}
+    table.lista th{background:#f0f0f0}
+    table.lista td.num,table.lista th.num{text-align:right;width:90px}
+    ul{margin:6px 0 0;padding-left:20px} li{line-height:1.8}
+    .vacio{color:#777;font-style:italic}
+    @media print{@page{margin:14mm}}
+  </style></head><body>
+  <h2>🔧 ${escOT(o.numero_orden)} <span class="estado">${escOT(String(o.estado||'').replace('_',' '))}</span></h2>
+  <table class="info">
+    <tr><td class="k">Cliente:</td><td><strong>${escOT(o.cliente)}</strong>${o.cliente_tel ? ' — ' + escOT(o.cliente_tel) : ''}</td></tr>
+    <tr><td class="k">Técnicos:</td><td>${tecnicos}</td></tr>
+    <tr><td class="k">Apertura:</td><td>${escOT(o.fecha_apertura)}</td></tr>
+    <tr><td class="k">Cierre:</td><td>${escOT(o.fecha_cierre || '—')}</td></tr>
+  </table>
+  ${vehiculo}
+  ${cuerpoHtml}
+  <script>window.onload=()=>window.print()<\/script>
+  </body></html>`;
+  const w = window.open('', '_blank');
+  if (!w) { toast('El navegador bloqueó la ventana. Permite pop-ups para este sitio.', 'warn'); return; }
+  w.document.write(html);
+  w.document.close();
+}
+
+function pdfOTTrabajo() {
+  const o = otDetalleActual;
+  if (!o) { toast('Abre primero el detalle de una OT.', 'warn'); return; }
+  const lineas = (o.descripcion_trabajo || '').split('\n').filter(l => l.trim());
+  const cuerpo = `<h3>📋 Trabajo</h3>` + (lineas.length
+    ? `<ul>${lineas.map(l => `<li>${escOT(l)}</li>`).join('')}</ul>`
+    : `<p class="vacio">Sin trabajos registrados.</p>`);
+  abrirPDFOT(o, 'Trabajo', cuerpo);
+}
+
+function pdfOTMateriales() {
+  const o = otDetalleActual;
+  if (!o) { toast('Abre primero el detalle de una OT.', 'warn'); return; }
+  const mats = o.materiales || [];
+  const cuerpo = `<h3>📦 Materiales utilizados</h3>` + (mats.length
+    ? `<table class="lista"><thead><tr><th>Material</th><th class="num">Cantidad</th></tr></thead><tbody>
+        ${mats.map(m => `<tr><td>${escOT(m.material)} <small style="color:#666">${escOT(m.unidad_medida || '')}</small></td><td class="num">${escOT(m.cantidad)}</td></tr>`).join('')}
+       </tbody></table>`
+    : `<p class="vacio">Sin materiales registrados.</p>`);
+  abrirPDFOT(o, 'Materiales', cuerpo);
+}

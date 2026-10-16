@@ -68,14 +68,16 @@ function generarPDF(array $f): void {
   @page { size: letter; margin: 10mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    font-family: 'Georgia', 'Times New Roman', serif;
+    font-family:'Times New Roman', serif;
     font-size: 10.5px;
     color: #1a1a1a;
-    background: #cfe8e0;
+    background: #ffffff;
+    /*background: #cfe8e0;*/
     padding: 14px;
   }
   .hoja {
-    background: #cfe8e0;
+    background: #ffffff;
+    /*background: #cfe8e0;*/
     max-width: 800px;
     margin: 0 auto;
     border: 2px solid #1a1a1a;
@@ -98,7 +100,8 @@ function generarPDF(array $f): void {
   .fecha-tabla { border-collapse: collapse; margin-top: 6px; margin-left: auto; }
   .fecha-tabla th, .fecha-tabla td {
     border: 1px solid #1a1a1a; padding: 3px 14px; font-size: 9px; text-align: center;
-    background: #b8d8ce;
+    background: #e8f0ed;
+    /*background: #b8d8ce;*/
   }
   .fecha-tabla th { font-weight: bold; }
 
@@ -129,26 +132,53 @@ function generarPDF(array $f): void {
 
   .totales-tabla { border-collapse: collapse; }
   .totales-tabla td {
-    border: 1px solid #1a1a1a; font-size: 10px; padding: 3px 8px;
+                      border: 1px solid #1a1a1a; 
+                      font-size: 10px; 
+                      padding: 3px 8px;
   }
-  .totales-tabla td.lbl { background: #1a1a1a; color: #fff; font-weight: bold; text-align: right; min-width: 190px; }
-  .totales-tabla td.val { background: #b8d8ce; text-align: right; min-width: 90px; font-weight: bold; }
-  .totales-tabla tr.total-final td.lbl { background: #1a1a1a; font-size: 11px; }
+  .totales-tabla td.lbl { background: #1a1a1a; 
+                          color: #fff; 
+                          font-weight: bold; 
+                          text-align: right; min-width: 190px; }
+  .totales-tabla td.val { background: #ffffff;
+                          /*background: #b8d8ce;*/
+                          text-align: right; 
+                          min-width: 90px; 
+                          font-weight: bold; }
+  .totales-tabla tr.total-final td.lbl { background: #1a1a1a; 
+                                         font-size: 11px; }
   .totales-tabla tr.total-final td.val { font-size: 12px; }
 
-  .cai-box { font-size: 10px; margin-top: 10px; line-height: 1.6; }
+  .cai-box { font-size: 10px; 
+              margin-top: 10px; 
+              line-height: 1.6; }
   .cai-box b { font-weight: bold; }
 
-  .exonerado-tabla { border-collapse: collapse; margin-top: 6px; width: 100%; max-width: 340px; }
-  .exonerado-tabla td { border: 1px solid #1a1a1a; font-size: 8px; padding: 2px 6px; }
-  .exonerado-tabla td.head { font-weight: bold; background: #b8d8ce; }
+  .exonerado-tabla { border-collapse: 
+                      collapse; margin-top: 6px; 
+                      width: 100%; max-width: 340px; }
+  .exonerado-tabla td { border: 1px solid #1a1a1a; 
+                        font-size: 8px; 
+                        padding: 2px 6px; }
+  .exonerado-tabla td.head { font-weight: bold; 
+                             background: #e8f0ed;/*#b8d8ce;*/ }
 
-  .firma-final { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 30px; }
-  .firma-linea { border-top: 1px solid #1a1a1a; width: 220px; text-align: center; font-size: 9.5px; padding-top: 3px; }
-  .lema { font-style: italic; font-size: 11px; font-weight: bold; }
+  .firma-final { display: flex; 
+                 justify-content: space-between; 
+                 align-items: flex-end; 
+                 margin-top: 30px; }
+  .firma-linea { border-top: 1px solid #1a1a1a; 
+                 width: 220px; 
+                 text-align: center; 
+                 font-size: 9.5px; 
+                 padding-top: 3px; }
+  .lema { font-style: italic; 
+          font-size: 11px; 
+          font-weight: bold; }
 
   @media print {
-    body { background: #fff; padding: 0; }
+    body { background: #fff; 
+           padding: 0; }
     .hoja { border: none; }
   }
 </style>
@@ -159,7 +189,7 @@ function generarPDF(array $f): void {
   <!-- ENCABEZADO -->
   <div class="top">
     <div class="logo-block">
-      <img src="../assets/img/VAMER.png" alt="VAMER" class="logo-img" onerror="this.style.display='none'">
+      <img src="../assets/img/VAMER1.png" alt="VAMER" class="logo-img" onerror="this.style.display='none'">
       <div>
         <div class="empresa-datos">VENTAS AMERICA SOCIEDAD DE<br>RESPONSABILIDAD LIMITADA</div>
         <div class="empresa-info">

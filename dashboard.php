@@ -51,6 +51,7 @@ function puedeVerModulo(string $dataModule) {
   <title>VAMER — Dashboard</title>
   <link rel="stylesheet" href="assets/css/dashboard.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <link rel="icon" type="image" href="assets/img/VAMER1.png">
 </head>
 <body>
 <div id="overlay"></div>
@@ -128,7 +129,7 @@ function puedeVerModulo(string $dataModule) {
         <?php if (puedeVerModulo('cai')): ?><a class="nav-item" data-module="cai"           title="CAI"><span class="nav-icon">🏷️</span><span class="nav-text">CAI</span></a><?php endif; ?>
         <?php if (puedeVerModulo('libro_ventas')): ?><a class="nav-item" data-module="libro_ventas"  title="Libro de Ventas"><span class="nav-icon">📒</span><span class="nav-text">Libro de Ventas</span></a><?php endif; ?>
         <?php if (puedeVerModulo('pagos')): ?><a class="nav-item" data-module="pagos"         title="Pagos"><span class="nav-icon">💵</span><span class="nav-text">Pagos</span></a><?php endif; ?>
-        <?php if (puedeVerModulo('gastos')): ?><a class="nav-item" data-module="gastos"        title="Gastos DMC"><span class="nav-icon">🧾</span><span class="nav-text">Gastos DMC</span></a><?php endif; ?>
+        <?php if (puedeVerModulo('gastos')): ?><a class="nav-item" data-module="gastos"        title="Gastos DMC"><span class="nav-icon">🧾</span><span class="nav-text">Gastos</span></a><?php endif; ?>
       </div>
     </div>
     <?php endif; ?>

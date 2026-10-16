@@ -598,9 +598,9 @@ async function confirmarFacturarMovimientos() {
   if (!multiMovsSeleccionadas.size) { errEl.textContent = 'Selecciona al menos un movimiento.'; errEl.style.display = 'block'; return; }
   if (!multiMovMetodoSelec) { errEl.textContent = 'Selecciona un método de pago.'; errEl.style.display = 'block'; return; }
 
-  const rCai = await api('controllers/FacturacionController.php?action=cai_activo');
-  if (!rCai.ok || !rCai.data.data) {
-    errEl.textContent = 'No hay CAI activo. Configure el CAI antes de facturar.';
+  const vCai = await validarCAIParaFacturar();
+  if (!vCai.ok) {
+    errEl.textContent = vCai.error;
     errEl.style.display = 'block'; return;
   }
 

@@ -156,9 +156,9 @@ async function confirmarFacturarMultiple() {
   }
 
   // Verificar CAI activo
-  const rCai = await api('controllers/FacturacionController.php?action=cai_activo');
-  if (!rCai.ok || !rCai.data.data) {
-    errEl.textContent = 'No hay CAI activo. Configure el CAI antes de facturar.';
+  const vCai = await validarCAIParaFacturar();
+  if (!vCai.ok) {
+    errEl.textContent = vCai.error;
     errEl.style.display = 'block'; return;
   }
 

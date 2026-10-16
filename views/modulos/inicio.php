@@ -59,4 +59,11 @@
     <div class="table-wrap" id="otRecientes"><p class="loading">Cargando...</p></div>
   </div>
 
+  <!-- Footer -->
+  <?php require_once __DIR__ . '/../../config/version.php'; ?>
+  <footer style="margin-top:24px;padding:14px 0 4px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px 16px;font-size:12px;color:var(--muted)">
+    <span>© <?= date('Y') ?> Ventas América S. de R.L. Todos los derechos reservados.</span>
+    <span>Sistema Administrativo VAMER · Versión <?= htmlspecialchars(SISTEMA_VERSION) ?></span>
+  </footer>
+
 </div>

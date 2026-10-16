@@ -15,6 +15,7 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 match(true) {
     $action === 'listar'          && $method === 'GET'  => listar(),
+    $action === 'tipos'           && $method === 'GET'  => tipos(),
     $action === 'por_cliente'     && $method === 'GET'  => porCliente(),
     $action === 'obtener'         && $method === 'GET'  => obtener(),
     $action === 'por_placa'       && $method === 'GET'  => porPlaca(),
@@ -32,6 +33,15 @@ function listar(): void {
         JOIN clientes c ON c.id_cliente = v.cliente_id
         WHERE v.estado = 'activo'
         ORDER BY v.placa
+    ");
+    responder(200, ['ok' => true, 'data' => $stmt->fetchAll()]);
+}
+
+function tipos(): void {
+    $stmt = getDB()->query("
+        SELECT id_tipo, nombre FROM tipos_vehiculo
+        WHERE estado = 'activo'
+        ORDER BY id_tipo
     ");
     responder(200, ['ok' => true, 'data' => $stmt->fetchAll()]);
 }

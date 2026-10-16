@@ -135,9 +135,9 @@ let fdItemCount = 0;
 
 async function abrirModalFacturaDirecta() {
   // Verificar CAI activo
-  const rCai = await api('controllers/FacturacionController.php?action=cai_activo');
-  if (!rCai.ok || !rCai.data.data) {
-    toast('No hay CAI activo. Configure el CAI antes de facturar.', 'error');
+  const vCai = await validarCAIParaFacturar();
+  if (!vCai.ok) {
+    toast(vCai.error, 'error', 7000);
     setTimeout(() => abrirModalCAI(), 800);
     return;
   }
@@ -285,9 +285,9 @@ let facturarCotId = null;
 
 async function abrirModalFacturar(cotizacion_id) {
   facturarCotId = cotizacion_id;
-  const rCai = await api('controllers/FacturacionController.php?action=cai_activo');
-  if (!rCai.ok || !rCai.data.data) {
-    toast('No hay CAI activo. Configure el CAI antes de facturar.', 'error');
+  const vCai = await validarCAIParaFacturar();
+  if (!vCai.ok) {
+    toast(vCai.error, 'error', 7000);
     setTimeout(() => abrirModalCAI(), 800);
     return;
   }
