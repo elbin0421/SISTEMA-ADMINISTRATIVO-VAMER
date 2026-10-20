@@ -31,6 +31,8 @@ $moduloPermiso = [
     'gastos'        => 'gastos',
     'planillas'     => 'planillas',
     'vacaciones'    => 'vacaciones',
+    'recibos'       => 'recibos',
+    'asistencia'    => 'asistencia',
     'reportes'      => 'reportes',
 ];
 
@@ -48,12 +50,17 @@ function puedeVerModulo(string $dataModule) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VAMER — Dashboard</title>
+  <title><?= (defined('ENTORNO') && ENTORNO === 'pruebas') ? '[PRUEBAS] ' : '' ?>VAMER — Dashboard</title>
   <link rel="stylesheet" href="assets/css/dashboard.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <link rel="icon" type="image" href="assets/img/VAMER1.png">
 </head>
 <body>
+<?php if (defined('ENTORNO') && ENTORNO === 'pruebas'): ?>
+<div style="position:fixed;top:0;left:0;right:0;z-index:99999;background:#c62828;color:#fff;text-align:center;font:700 12px Arial,sans-serif;padding:3px 0;letter-spacing:.5px;pointer-events:none">
+  ⚠️ AMBIENTE DE PRUEBAS — los datos NO son de producción
+</div>
+<style>body{padding-top:22px}</style>
+<?php endif; ?>
 <div id="overlay"></div>
 
 <!-- SIDEBAR -->
@@ -129,13 +136,13 @@ function puedeVerModulo(string $dataModule) {
         <?php if (puedeVerModulo('cai')): ?><a class="nav-item" data-module="cai"           title="CAI"><span class="nav-icon">🏷️</span><span class="nav-text">CAI</span></a><?php endif; ?>
         <?php if (puedeVerModulo('libro_ventas')): ?><a class="nav-item" data-module="libro_ventas"  title="Libro de Ventas"><span class="nav-icon">📒</span><span class="nav-text">Libro de Ventas</span></a><?php endif; ?>
         <?php if (puedeVerModulo('pagos')): ?><a class="nav-item" data-module="pagos"         title="Pagos"><span class="nav-icon">💵</span><span class="nav-text">Pagos</span></a><?php endif; ?>
-        <?php if (puedeVerModulo('gastos')): ?><a class="nav-item" data-module="gastos"        title="Gastos DMC"><span class="nav-icon">🧾</span><span class="nav-text">Gastos</span></a><?php endif; ?>
+        <?php if (puedeVerModulo('gastos')): ?><a class="nav-item" data-module="gastos"        title="Gastos DMC"><span class="nav-icon">🧾</span><span class="nav-text">Gastos DMC</span></a><?php endif; ?>
       </div>
     </div>
     <?php endif; ?>
 
     <!-- ── 4. RRHH ── -->
-    <?php if (puedeVerModulo('planillas') || puedeVerModulo('vacaciones')): ?>
+    <?php if (puedeVerModulo('planillas') || puedeVerModulo('vacaciones') || puedeVerModulo('recibos') || puedeVerModulo('asistencia')): ?>
     <div class="nav-group" id="grp-rrhh">
       <div class="nav-group-header" onclick="toggleGrupo('rrhh')" title="RRHH">
         <span class="nav-icon">👷</span>
@@ -145,6 +152,8 @@ function puedeVerModulo(string $dataModule) {
       <div class="nav-group-body">
         <?php if (puedeVerModulo('planillas')): ?><a class="nav-item" data-module="planillas" title="Planilla"><span class="nav-icon">📋</span><span class="nav-text">Planilla</span></a><?php endif; ?>
         <?php if (puedeVerModulo('vacaciones')): ?><a class="nav-item" data-module="vacaciones" title="Vacaciones"><span class="nav-icon">🏖️</span><span class="nav-text">Vacaciones</span></a><?php endif; ?>
+        <?php if (puedeVerModulo('recibos')): ?><a class="nav-item" data-module="recibos" title="Recibos"><span class="nav-icon">🧾</span><span class="nav-text">Recibos</span></a><?php endif; ?>
+        <?php if (puedeVerModulo('asistencia')): ?><a class="nav-item" data-module="asistencia" title="Tiempo Extra y Faltas"><span class="nav-icon">🕒</span><span class="nav-text">Tiempo Extra y Faltas</span></a><?php endif; ?>
       </div>
     </div>
     <?php endif; ?>
@@ -193,7 +202,7 @@ function puedeVerModulo(string $dataModule) {
     $modulos = [
       'inicio','clientes','vehiculos','inventario','requisiciones','compras','proveedores',
       'ordenes','cotizaciones','movimientos','catalogo','facturacion','cai','libro_ventas',
-      'pagos','planillas','vacaciones','gastos','reportes','usuarios_roles',
+      'pagos','planillas','vacaciones','recibos','asistencia','gastos','reportes','usuarios_roles',
     ];
     foreach ($modulos as $mod) {
       $f = __DIR__ . "/views/modulos/{$mod}.php";
@@ -203,7 +212,7 @@ function puedeVerModulo(string $dataModule) {
     $modales = [
       'clientes','vehiculos','inventario','compras_proveedores',
       'ordenes','cotizaciones','movimientos','catalogo_precios','facturacion',
-      'pagos','planillas','planillas_especiales','vacaciones','gastos','usuarios','requisicion',
+      'pagos','planillas','planillas_especiales','vacaciones','recibos','asistencia','gastos','usuarios','requisicion',
     ];
     foreach ($modales as $modal) {
       $f = __DIR__ . "/views/modales/{$modal}.php";
@@ -244,6 +253,8 @@ function puedeVerModulo(string $dataModule) {
 <script src="assets/js/modules/facturar_multiple.js"></script>
 <script src="assets/js/modules/vehiculos.js"></script>
 <script src="assets/js/modules/vacaciones.js"></script>
+<script src="assets/js/modules/recibos.js"></script>
+<script src="assets/js/modules/asistencia.js"></script>
 <script src="assets/js/modules/movimientos.js"></script>
 <script src="assets/js/modules/gastos.js"></script>
 <script src="assets/js/modules/catalogo.js"></script>

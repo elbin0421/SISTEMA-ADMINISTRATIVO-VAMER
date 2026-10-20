@@ -5,6 +5,8 @@
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/auth.php';
 require_once __DIR__ . '/../models/PlanillaModel.php';
+require_once __DIR__ . '/../models/ReciboModel.php';
+require_once __DIR__ . '/../models/AsistenciaModel.php';
 
 header('Content-Type: application/json');
 
@@ -18,6 +20,10 @@ match(true) {
     $action === 'listar'        && $method === 'GET'  => listar(),
     $action === 'obtener'       && $method === 'GET'  => obtener(),
     $action === 'previsualizar' && $method === 'GET'  => previsualizar(),
+    $action === 'recibos_pendientes' && $method === 'GET' => recibosPendientes(),
+    $action === 'recibos_de_planilla' && $method === 'GET' => recibosDePlanilla(),
+    $action === 'asistencia_pendiente' && $method === 'GET' => asistenciaPendiente(),
+    $action === 'asistencia_de_planilla' && $method === 'GET' => responder(200, ['ok' => true, 'data' => AsistenciaModel::dePlanilla((int)($_GET['id'] ?? 0))]),
     $action === 'generar'       && $method === 'POST' => generar($sesion),
     $action === 'cerrar'        && $method === 'POST' => cerrar($sesion),
     $action === 'eliminar'      && $method === 'POST' => eliminar($sesion),
@@ -43,6 +49,19 @@ function previsualizar(): void {
         responder(200, ['ok' => true, 'data' => PlanillaModel::previsualizar($mes, $anio, $quincena, [], $empresa_id)]);
     } catch (Exception $e) { responder(400, ['error' => $e->getMessage()]); }
 }
+function recibosPendientes(): void {
+    $hasta = $_GET['hasta'] ?? date('Y-m-d');
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $hasta)) { responder(400, ['error' => 'Fecha inválida']); return; }
+    responder(200, ['ok' => true, 'data' => ReciboModel::pendientesPlanilla($hasta, (int)($_GET['empresa_id'] ?? 0), (string)($_GET['quincena'] ?? '1ra'))]);
+}
+function asistenciaPendiente(): void {
+    $hasta = $_GET['hasta'] ?? date('Y-m-d');
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $hasta)) { responder(400, ['error' => 'Fecha inválida']); return; }
+    responder(200, ['ok' => true, 'data' => AsistenciaModel::pendientesPlanilla($hasta, (int)($_GET['empresa_id'] ?? 0))]);
+}
+function recibosDePlanilla(): void {
+    responder(200, ['ok' => true, 'data' => ReciboModel::deLaPlanilla((int)($_GET['id'] ?? 0))]);
+}
 function generar(array $sesion): void {
     requirePermiso($sesion['rol_id'], 'planillas', 'puede_crear');
     $d = json_decode(file_get_contents('php://input'), true) ?? [];
@@ -65,7 +84,9 @@ function generar(array $sesion): void {
             $extrasMap,
             $sesion['usuario_id'],
             $excluirId,
-            $empresa_id
+            $empresa_id,
+            array_map('intval', (array)($d['recibos_ids'] ?? [])),
+            array_map('intval', (array)($d['asistencia_ids'] ?? []))
         );
         responder(201, ['ok' => true, 'id' => $id, 'data' => PlanillaModel::obtener($id)]);
     } catch (Exception $e) { responder(400, ['error' => $e->getMessage()]); }

@@ -9,6 +9,8 @@
 // ============================================================
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../models/EmpleadoModel.php';
+require_once __DIR__ . '/../models/ReciboModel.php';
+require_once __DIR__ . '/../models/AsistenciaModel.php';
 
 class PlanillaModel {
 
@@ -114,7 +116,7 @@ class PlanillaModel {
     /**
      * Genera y guarda la planilla quincenal.
      */
-    public static function generar(int $mes, int $anio, string $quincena, string $fecha_pago, string $observaciones, array $extrasMap, int $usuario_id, int $excluirId = 0, int $empresa_id = 0): int {
+    public static function generar(int $mes, int $anio, string $quincena, string $fecha_pago, string $observaciones, array $extrasMap, int $usuario_id, int $excluirId = 0, int $empresa_id = 0, array $recibosIds = [], array $asistenciaIds = []): int {
         $pdo = getDB();
 
         $sql = "SELECT id_planilla FROM planillas WHERE periodo_mes=? AND periodo_anio=? AND quincena=? AND (empresa_id = ? OR (empresa_id IS NULL AND ? = 0))";
@@ -197,6 +199,11 @@ class PlanillaModel {
                 ]);
             }
 
+            // Recibos (viáticos / adelantos / abonos) incluidos en esta planilla
+            ReciboModel::aplicarAPlanilla($pdo, $planilla_id, $recibosIds);
+            // Registros de tiempo extra / días faltados incluidos
+            AsistenciaModel::aplicarAPlanilla($pdo, $planilla_id, $asistenciaIds);
+
             $pdo->commit();
             return $planilla_id;
         } catch (Exception $e) {
@@ -261,6 +268,9 @@ class PlanillaModel {
         $p = $stmt->fetch();
         if (!$p) throw new Exception('Planilla no encontrada.');
         if ($p['estado'] === 'cerrada') throw new Exception('No se puede eliminar una planilla cerrada.');
+        // Liberar los recibos que se habían aplicado a esta planilla
+        ReciboModel::liberarPlanilla($pdo, $id);
+        AsistenciaModel::liberarPlanilla($pdo, $id);
         return $pdo->prepare("DELETE FROM planillas WHERE id_planilla=?")->execute([$id]);
     }
 

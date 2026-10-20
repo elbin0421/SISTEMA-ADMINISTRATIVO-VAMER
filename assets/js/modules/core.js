@@ -96,7 +96,7 @@ function updateClock() {
 updateClock(); setInterval(updateClock, 1000);
 
 // ── NAVEGACIÓN ───────────────────────────────────────────────
-const modTitles = { inicio:'Inicio', clientes:'Clientes', vehiculos:'Vehículos', inventario:'Inventario', requisiciones:'Requisiciones de Materiales', compras:'Compras', proveedores:'Proveedores', ordenes:'Órdenes de Trabajo', usuarios:'Usuarios', roles:'Roles y Permisos', cotizaciones:'Cotizaciones', movimientos:'Movimientos', catalogo:'Catálogo de Precios', facturacion:'Facturación', libro_ventas:'Libro de Ventas', vacaciones:'Vacaciones', gastos:'Gastos DMC / SAR Honduras' };
+const modTitles = { inicio:'Inicio', clientes:'Clientes', vehiculos:'Vehículos', inventario:'Inventario', requisiciones:'Requisiciones de Materiales', compras:'Compras', proveedores:'Proveedores', ordenes:'Órdenes de Trabajo', usuarios:'Usuarios', roles:'Roles y Permisos', cotizaciones:'Cotizaciones', movimientos:'Movimientos', catalogo:'Catálogo de Precios', facturacion:'Facturación', libro_ventas:'Libro de Ventas', vacaciones:'Vacaciones', recibos:'Recibos', asistencia:'Tiempo Extra y Días Faltados', gastos:'Gastos DMC / SAR Honduras' };
 document.querySelectorAll('.nav-item[data-module]').forEach(el => {
   el.addEventListener('click', function() {
     const mod = this.dataset.module;
@@ -120,6 +120,8 @@ document.querySelectorAll('.nav-item[data-module]').forEach(el => {
       pagos:     () => { if (typeof cargarModuloPagos    === 'function') cargarModuloPagos(); },
       planillas: () => { if (typeof cargarModuloPlanillas=== 'function') cargarModuloPlanillas(); },
       vacaciones: () => { if (typeof cargarVacaciones=== 'function') cargarVacaciones(); },
+      recibos:   () => { if (typeof cargarRecibos === 'function') cargarRecibos(); },
+      asistencia: () => { if (typeof cargarAsistencia === 'function') cargarAsistencia(); },
       gastos: () => { initFiltrosGastos(); cargarGastos(); },
       reportes:  () => {},
       cai:       () => cargarModuloCAI(),
@@ -221,6 +223,8 @@ function irPagina(modulo, pagina) {
     empleados:      () => renderTablaEmpleados(datosModulo[modulo]),
     planillas_list: () => renderTablaPlanillas(datosModulo[modulo]),
     gastos:         () => renderTablaGastos(datosModulo[modulo]),
+    recibos:        () => renderTablaRecibos(datosModulo[modulo]),
+    asistencia:     () => renderTablaAsistencia(datosModulo[modulo]),
     movimientos:    () => renderTablaMovimientos(datosModulo[modulo]),
     reporte:        () => renderReporte({ data: datosModulo[modulo] }),
   };

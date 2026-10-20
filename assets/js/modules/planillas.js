@@ -278,7 +278,76 @@ function abrirModalGenerarPlanilla() {
   document.getElementById('planExtrasWrap').innerHTML =
     '<p style="color:var(--muted);font-size:13px">Haz clic en "Cargar empleados" para ver la tabla de ajustes.</p>';
   planEmpleadosExtras = [];
+  planRecibosIds = []; planRecibosInfo = []; planAsistIds = []; planAsistInfo = [];
+  window._planillaEditandoId = 0;
   abrirModal('modalGenerarPlanilla');
+}
+
+// ── Recibos pendientes que se incluyen en la planilla ─────
+let planRecibosIds  = [];   // ids de recibos que se marcarán como aplicados al generar
+let planRecibosInfo = [];   // para el aviso en pantalla
+let planAsistIds    = [];   // registros de tiempo extra / faltas que se marcarán como aplicados
+let planAsistInfo   = [];
+
+function planFinQuincena() {
+  const mes  = +document.getElementById('planMes').value;
+  const anio = +document.getElementById('planAnio').value;
+  const dia  = planQuincenaSeleccionada === '2da' ? new Date(anio, mes, 0).getDate() : 15;
+  return `${anio}-${String(mes).padStart(2,'0')}-${String(dia).padStart(2,'0')}`;
+}
+
+// Viáticos: van al slot de la semana del recibo (viatico_s1..s4) y se SUMAN si hay varios recibos
+// de la misma semana. Adelanto de salario -> Abono Vale | Abono préstamo -> Abono Préstamo.
+function aplicarRecibosAExtras(recibos) {
+  planRecibosIds = []; planRecibosInfo = [];
+  recibos.forEach(r => {
+    const emp = planEmpleadosExtras.find(e => +e.empleado_id === +r.empleado_id);
+    if (!emp) return;
+    const via = parseFloat(r.viaticos || 0), adel = parseFloat(r.adelanto || 0), abo = parseFloat(r.abono_prestamo || 0);
+    if (via > 0 && +r.semana >= 1 && +r.semana <= 4) {
+      const k = 'viatico_s' + (+r.semana);
+      emp[k] = (emp[k] || 0) + via;
+    }
+    if (adel > 0) emp.abono_vale     = (emp.abono_vale     || 0) + adel;
+    if (abo  > 0) emp.abono_prestamo = (emp.abono_prestamo || 0) + abo;
+    planRecibosIds.push(+r.id_recibo);
+    planRecibosInfo.push(r);
+  });
+}
+
+// Tiempo extra y días faltados: la planilla solo carga las CANTIDADES y calcula el valor
+function aplicarAsistenciaAExtras(registros) {
+  planAsistIds = []; planAsistInfo = [];
+  const horas = {}, dias = {};
+  registros.forEach(r => {
+    const emp = planEmpleadosExtras.find(e => +e.empleado_id === +r.empleado_id);
+    if (!emp) return;
+    const c = parseFloat(r.cantidad || 0);
+    if (r.tipo === 'horas_extra') horas[emp.empleado_id] = (horas[emp.empleado_id] || 0) + c;
+    else dias[emp.empleado_id] = (dias[emp.empleado_id] || 0) + c;
+    planAsistIds.push(+r.id_registro);
+    planAsistInfo.push(r);
+  });
+  planEmpleadosExtras.forEach(e => {
+    if (horas[e.empleado_id]) e.horas_extra   = horas[e.empleado_id];
+    if (dias[e.empleado_id])  e.dias_faltados = dias[e.empleado_id];
+  });
+}
+
+function bannerAsistenciaPlanilla() {
+  if (!planAsistInfo.length) return '';
+  const h = planAsistInfo.filter(r => r.tipo === 'horas_extra').reduce((a, r) => a + parseFloat(r.cantidad), 0);
+  const d = planAsistInfo.filter(r => r.tipo !== 'horas_extra').reduce((a, r) => a + parseFloat(r.cantidad), 0);
+  return `<div style="font-size:12px;margin-bottom:8px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:rgba(0,200,83,.08)">
+    🕒 <b>${planAsistInfo.length} registro(s)</b> de tiempo extra / faltas incluidos: ${h} h extra y ${d} día(s) faltado(s) en total.</div>`;
+}
+
+function bannerRecibosPlanilla() {
+  if (!planRecibosInfo.length) return '';
+  const lista = planRecibosInfo.map(r => `${escRec(r.numero)} (${escRec(r.empleado_nombre)}${r.semana && parseFloat(r.viaticos) > 0 ? ' · S.'+r.semana : ''})`).join(', ');
+  return `<div style="font-size:12px;margin-bottom:8px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:rgba(0,200,83,.08)">
+    🧾 <b>${planRecibosInfo.length} recibo(s)</b> incluidos en esta planilla: ${lista}.
+    Viáticos suman; adelantos y abonos a préstamo se descuentan.</div>`;
 }
 
 async function cargarExtrasEmpleados() {
@@ -300,6 +369,18 @@ async function cargarExtrasEmpleados() {
     viatico_s1:0, viatico_s2:0, viatico_s3:0, viatico_s4:0,
     aplicar_seguro: true,
   }));
+  // Recibos pendientes hasta el fin de la quincena
+  planRecibosIds = []; planRecibosInfo = []; planAsistIds = []; planAsistInfo = [];
+  const ra = await api(`controllers/PlanillaController.php?action=asistencia_pendiente&hasta=${planFinQuincena()}${empresaId ? '&empresa_id='+empresaId : ''}`);
+  if (ra.ok && ra.data.data.length) {
+    aplicarAsistenciaAExtras(ra.data.data);
+    if (planAsistIds.length) toast(`${planAsistIds.length} registro(s) de tiempo extra/faltas incluido(s).`);
+  }
+  const rr = await api(`controllers/PlanillaController.php?action=recibos_pendientes&quincena=${planQuincenaSeleccionada}&hasta=${planFinQuincena()}${empresaId ? '&empresa_id='+empresaId : ''}`);
+  if (rr.ok && rr.data.data.length) {
+    aplicarRecibosAExtras(rr.data.data);
+    if (planRecibosIds.length) toast(`${planRecibosIds.length} recibo(s) incluido(s) en la planilla.`);
+  }
   renderExtrasTable();
 }
 
@@ -324,7 +405,7 @@ function renderExtrasTable() {
   const es2da = planQuincenaSeleccionada === '2da';
   const viaLabel1 = es2da ? 'VIÁTICOS S.3' : 'VIÁTICOS S.1';
   const viaLabel2 = es2da ? 'VIÁTICOS S.4' : 'VIÁTICOS S.2';
-  let h = `<table style="min-width:1100px"><thead><tr>
+  let h = bannerAsistenciaPlanilla() + bannerRecibosPlanilla() + `<table style="min-width:1100px"><thead><tr>
     <th style="text-align:left">Empleado</th>
     <th>Empresa</th>
     <th>Ubic.</th>
@@ -517,6 +598,13 @@ async function editarPlanilla(id) {
       : (parseFloat(d.seguro_privado || 0) > 0),
   }));
 
+  // Recibos que ya estaban aplicados a esta planilla (se reaplican al regenerar)
+  planRecibosIds = []; planRecibosInfo = [];
+  const rr = await api('controllers/PlanillaController.php?action=recibos_de_planilla&id=' + id);
+  if (rr.ok) { planRecibosInfo = rr.data.data; planRecibosIds = planRecibosInfo.map(r => +r.id_recibo); }
+  planAsistIds = []; planAsistInfo = [];
+  const ra = await api('controllers/PlanillaController.php?action=asistencia_de_planilla&id=' + id);
+  if (ra.ok) { planAsistInfo = ra.data.data; planAsistIds = planAsistInfo.map(r => +r.id_registro); }
   renderExtrasTable();
   document.getElementById('planPreview').style.display = 'none';
   window._planillaEditandoId = id;
@@ -537,6 +625,8 @@ async function confirmarGenerarPlanilla() {
     fecha_pago:   document.getElementById('planFechaPago').value,
     observaciones:document.getElementById('planObs').value.trim(),
     excluir_id:   editandoId,
+    recibos_ids:  planRecibosIds,
+    asistencia_ids: planAsistIds,
     empresa_id:   document.getElementById('planFiltroEmpresa')?.value || 0,
     extras:       planEmpleadosExtras.map(e => ({
       empleado_id:    e.empleado_id,

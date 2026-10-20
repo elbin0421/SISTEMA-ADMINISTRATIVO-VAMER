@@ -61,11 +61,19 @@ async function cargarLibroVentas() {
 
   let h = `<table>
     <thead><tr>
-      <th>No.</th><th>Número Factura</th><th>Fecha</th>
-      <th>Cliente</th><th>RTN Cliente</th>
-      <th>OT / Cotización</th><th>Subtotal</th><th>ISV 15%</th>
-      <th>Total</th><th>CAI</th><th>Estado</th>
-    </tr></thead><tbody>`;
+      <th>No.</th>
+      <th>Número Factura</th>
+      <th>Fecha</th>
+      <th>Cliente</th>
+      <th>RTN Cliente</th>
+      <th>OT / Cotización</th>
+      <th>Subtotal</th>
+      <th>ISV 15%</th>
+      <th>Total</th>
+      <th>CAI</th>
+      <th>Estado</th>
+    </tr></thead>
+    <tbody>`;
 
   data.filas.forEach((f, i) => {
     const v = filaLibroVentas(f);
@@ -182,8 +190,17 @@ function exportarLibroVentasPDF() {
   </div>
   <table>
     <thead><tr>
-      <th>No.</th><th>Número Factura</th><th>Fecha</th><th>Cliente</th><th>RTN Cliente</th>
-      <th>OT / Cotización</th><th>Subtotal</th><th>ISV 15%</th><th>Total</th><th>CAI</th><th>Estado</th>
+      <th>No.</th>
+      <th>Número Factura</th>
+      <th>Fecha</th>
+      <th>Cliente</th>
+      <th>RTN Cliente</th>
+      <th>OT / Cotización</th>
+      <th>Subtotal</th>
+      <th>ISV 15%</th>
+      <th>Total</th>
+      <th>CAI</th>
+      <th>Estado</th>
     </tr></thead>
     <tbody>${filasHtml}</tbody>
     <tfoot><tr>
