@@ -53,6 +53,7 @@ function puedeVerModulo(string $dataModule) {
   <title><?= (defined('ENTORNO') && ENTORNO === 'pruebas') ? '[PRUEBAS] ' : '' ?>VAMER — Dashboard</title>
   <link rel="stylesheet" href="assets/css/dashboard.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <link rel="icon" type="image" href="assets/img/VAMER1.png">
 </head>
 <body>
 <?php if (defined('ENTORNO') && ENTORNO === 'pruebas'): ?>

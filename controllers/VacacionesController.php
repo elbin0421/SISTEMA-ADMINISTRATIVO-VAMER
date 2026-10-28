@@ -3,6 +3,7 @@
 //  SOLDYMEG — VacacionesController
 //  Cálculo y registro de vacaciones según Código del Trabajo HN
 //  Art. 346: 1-2 años=10 días | 2-3=12 | 3-4=15 | 4+=20
+//  + días proporcionales del año en curso (meses completos desde el último aniversario)
 // ============================================================
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/auth.php';
@@ -45,6 +46,14 @@ function diasProporcionales(int $mesesCompletos): float {
     return round((10 * $mesesCompletos) / 12, 2);
 }
 
+// Días proporcionales del año EN CURSO (meses completos desde el último aniversario),
+// al ritmo del tramo que se está ganando (años completos + 1).
+// Ej: 1 año y 9 meses -> tramo siguiente = 12 días -> 12 * 9 / 12 = 9.0 días.
+//     0 años y 6 meses -> tramo = 10 días -> 10 * 6 / 12 = 5.0 días.
+function diasProporcionalesAnioEnCurso(int $aniosCompletos, int $mesesCompletos): float {
+    return round((diasVacaciones($aniosCompletos + 1) * $mesesCompletos) / 12, 2);
+}
+
 // ── Cálculo único y central de antigüedad ──────────────────────
 // SIEMPRE se calcula desde la fecha de ingreso REAL del empleado
 // (columna empleados.fecha_ingreso) hasta la fecha de referencia.
@@ -60,21 +69,21 @@ function calcularAntiguedad(string $fechaIngreso, string $fechaReferencia): arra
     $aniosCompletos = (int)$diff->y;
     $mesesCompletos = (int)$diff->m;
     $aniosDecimal   = round($aniosCompletos + ($mesesCompletos / 12), 2);
-    $tieneDerecho   = $aniosCompletos >= 1;
 
-    if ($tieneDerecho) {
-        $dias = diasVacaciones($aniosCompletos);
-    } else {
-        $mesesTotales = ($aniosCompletos * 12) + $mesesCompletos;
-        $dias = diasProporcionales($mesesTotales);
-    }
+    // Días del tramo por años completos + proporcionales del año en curso.
+    // Ambos están disponibles para REGISTRAR (descanso o pago).
+    $diasTramo = diasVacaciones($aniosCompletos);                                   // 0 si < 1 año
+    $diasProp  = diasProporcionalesAnioEnCurso($aniosCompletos, $mesesCompletos);
+    $dias      = round($diasTramo + $diasProp, 2);
 
     return [
-        'anios_completos' => $aniosCompletos,
-        'anios_decimal'   => $aniosDecimal,
-        'dias'            => $dias,
-        'aplica'          => $tieneDerecho,      // puede REGISTRAR/tomar vacación
-        'proporcional'    => !$tieneDerecho,     // días son un acumulado informativo, aún no disponibles para tomar
+        'anios_completos'      => $aniosCompletos,
+        'anios_decimal'        => $aniosDecimal,
+        'dias'                 => $dias,                 // total: tramo + proporcionales
+        'dias_tramo'           => $diasTramo,
+        'dias_proporcionales'  => $diasProp,
+        'aplica'               => $dias > 0,             // puede REGISTRAR/tomar vacación
+        'proporcional'         => $aniosCompletos < 1,   // aún no cumple 1 año (todo es proporcional)
     ];
 }
 
@@ -92,6 +101,8 @@ function calcularVacacion(array $emp, string $fechaInicio, string $fechaFin): ar
         'anios_laborados'       => $ant['anios_decimal'],
         'anios_completos'       => $ant['anios_completos'],
         'dias_correspondientes' => $dias,
+        'dias_tramo'            => $ant['dias_tramo'],
+        'dias_proporcionales'   => $ant['dias_proporcionales'],
         'salario_diario'        => $salarioDiario,
         'monto_vacaciones'      => $monto,
         'aplica'                => $ant['aplica'],
@@ -182,7 +193,9 @@ function resumen(): void {
             $salDiario = round((float)$r['salario_mensual'] / 30, 2);
             $r['anios_actuales']  = $ant['anios_decimal'];
             $r['anios_completos'] = $ant['anios_completos'];
-            $r['dias_actuales']   = $ant['dias'];
+            $r['dias_actuales']   = $ant['dias'];   // tramo + proporcionales
+            $r['dias_tramo']          = $ant['dias_tramo'];
+            $r['dias_proporcionales'] = $ant['dias_proporcionales'];
             $r['proporcional']    = $ant['proporcional'];
             $r['salario_diario']  = $salDiario;
             $r['monto_actual']    = round($salDiario * $ant['dias'], 2);
@@ -190,6 +203,8 @@ function resumen(): void {
             $r['anios_actuales']  = 0;
             $r['anios_completos'] = 0;
             $r['dias_actuales']   = 0;
+            $r['dias_tramo']          = 0;
+            $r['dias_proporcionales'] = 0;
             $r['proporcional']    = false;
             $r['salario_diario']  = 0;
             $r['monto_actual']    = 0;
@@ -208,7 +223,7 @@ function registrar(array $sesion): void {
     $tipo        = trim($d['tipo']           ?? 'descanso');
     $fechaReg    = trim($d['fecha_registro'] ?? date('Y-m-d'));
     $obs         = strtoupper(trim($d['observaciones'] ?? ''));
-    $diasAUsar   = isset($d['dias_a_usar']) ? (int)$d['dias_a_usar'] : null;
+    $diasAUsar   = isset($d['dias_a_usar']) ? round((float)$d['dias_a_usar'], 2) : null;
 
     if (!$empId || !$fechaInicio) {
         responder(400, ['error' => 'Empleado y fecha de inicio son requeridos.']); return;
@@ -225,7 +240,7 @@ function registrar(array $sesion): void {
 
     $calc = calcularVacacion($emp, $fechaInicio, $fechaFin);
     if (!$calc['aplica']) {
-        responder(400, ['error' => 'El empleado necesita al menos 1 año laborado para tener derecho a vacaciones.']); return;
+        responder(400, ['error' => 'El empleado aún no tiene días acumulados (ni completos ni proporcionales).']); return;
     }
 
     // Días ya usados (sin anulados)
@@ -235,8 +250,8 @@ function registrar(array $sesion): void {
         WHERE empleado_id = ? AND estado NOT IN ('anulada')
     ");
     $stmtUsados->execute([$empId]);
-    $usados      = (int)$stmtUsados->fetchColumn();
-    $disponibles = $calc['dias_correspondientes'] - $usados;
+    $usados      = (float)$stmtUsados->fetchColumn();
+    $disponibles = round($calc['dias_correspondientes'] - $usados, 2);
 
     if ($disponibles <= 0) {
         responder(400, ['error' => "El empleado ya utilizó todos sus días ({$calc['dias_correspondientes']} días). Anule un registro anterior para continuar."]); return;
@@ -246,7 +261,7 @@ function registrar(array $sesion): void {
     if ($diasAUsar === null || $diasAUsar <= 0) {
         $diasAUsar = $disponibles; // Default: usar todos los disponibles
     }
-    if ($diasAUsar > $disponibles) {
+    if ($diasAUsar > $disponibles + 0.001) {
         responder(400, ['error' => "Solo quedan {$disponibles} días disponibles. No puede usar {$diasAUsar} días."]); return;
     }
 
@@ -297,7 +312,7 @@ function editar(array $sesion): void {
     $tipo        = trim($d['tipo']           ?? 'descanso');
     $fechaReg    = trim($d['fecha_registro'] ?? date('Y-m-d'));
     $obs         = strtoupper(trim($d['observaciones'] ?? ''));
-    $diasAUsar   = isset($d['dias_a_usar']) ? (int)$d['dias_a_usar'] : null;
+    $diasAUsar   = isset($d['dias_a_usar']) ? round((float)$d['dias_a_usar'], 2) : null;
 
     if (!$id || !$fechaInicio || !$fechaFin) {
         responder(400, ['error' => 'ID, fecha inicio y fecha fin son requeridos.']); return;
@@ -318,7 +333,7 @@ function editar(array $sesion): void {
     $emp  = ['salario_mensual' => $vac['salario_mensual'], 'fecha_ingreso' => $vac['fecha_ingreso']];
     $calc = calcularVacacion($emp, $fechaInicio, $fechaFin);
     if (!$calc['aplica']) {
-        responder(400, ['error' => 'El período no alcanza 1 año laborado.']); return;
+        responder(400, ['error' => 'El empleado aún no tiene días acumulados (ni completos ni proporcionales).']); return;
     }
 
     // Días disponibles excluyendo este registro
@@ -328,13 +343,13 @@ function editar(array $sesion): void {
         WHERE empleado_id = ? AND estado NOT IN ('anulada') AND id_vacacion != ?
     ");
     $stmtUsados->execute([$vac['empleado_id'], $id]);
-    $usados      = (int)$stmtUsados->fetchColumn();
-    $disponibles = $calc['dias_correspondientes'] - $usados;
+    $usados      = (float)$stmtUsados->fetchColumn();
+    $disponibles = round($calc['dias_correspondientes'] - $usados, 2);
 
     if ($diasAUsar === null || $diasAUsar <= 0) {
         $diasAUsar = $disponibles;
     }
-    if ($diasAUsar > $disponibles) {
+    if ($diasAUsar > $disponibles + 0.001) {
         responder(400, ['error' => "Solo quedan {$disponibles} días disponibles."]); return;
     }
 

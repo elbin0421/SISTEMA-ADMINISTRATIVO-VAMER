@@ -71,9 +71,9 @@ class GastosModel {
             $pdo->prepare("
                 INSERT INTO gastos_dmc
                   (fecha, rtn_proveedor, nombre_proveedor, tipo_documento, numero_factura,
-                   categoria, descripcion, subtotal, tasa_isv, isv, total, deducible,
+                   categoria, descripcion, uso_en, subtotal, tasa_isv, isv, total, deducible,
                    mes_declaracion, anio_declaracion, estado, observaciones, usuario_id)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
                 ->execute([
                     $d['fecha'],
                     trim($d['rtn_proveedor'] ?? '') ?: null,
@@ -81,7 +81,7 @@ class GastosModel {
                     $d['tipo_documento'] ?? 'factura',
                     trim($d['numero_factura'] ?? '') ?: null,
                     $d['categoria'] ?? 'otros',
-                    $desc, $sub, $tasa, $isv, $tot,
+                    $desc, mb_substr(strtoupper(trim($d['uso_en'] ?? '')), 0, 150) ?: null, $sub, $tasa, $isv, $tot,
                     isset($d['deducible']) ? (int)(bool)$d['deducible'] : 1,
                     (int)$d['mes_declaracion'], (int)$d['anio_declaracion'],
                     $d['estado'] ?? 'pendiente',
@@ -114,7 +114,7 @@ class GastosModel {
             $pdo->prepare("
                 UPDATE gastos_dmc SET
                   fecha=?, rtn_proveedor=?, nombre_proveedor=?, tipo_documento=?, numero_factura=?,
-                  categoria=?, descripcion=?, subtotal=?, tasa_isv=?, isv=?, total=?, deducible=?,
+                  categoria=?, descripcion=?, uso_en=?, subtotal=?, tasa_isv=?, isv=?, total=?, deducible=?,
                   mes_declaracion=?, anio_declaracion=?, estado=?, observaciones=?
                 WHERE id_gasto=?")
                 ->execute([
@@ -124,7 +124,7 @@ class GastosModel {
                     $d['tipo_documento'] ?? 'factura',
                     trim($d['numero_factura'] ?? '') ?: null,
                     $d['categoria'] ?? 'otros',
-                    $desc, $sub, $tasa, $isv, $tot,
+                    $desc, mb_substr(strtoupper(trim($d['uso_en'] ?? '')), 0, 150) ?: null, $sub, $tasa, $isv, $tot,
                     isset($d['deducible']) ? (int)(bool)$d['deducible'] : 1,
                     (int)$d['mes_declaracion'], (int)$d['anio_declaracion'],
                     $d['estado'] ?? 'pendiente',
@@ -187,6 +187,7 @@ class GastosModel {
                                     ? (int)$fila['tasa_isv'] : 15,
                 'deducible'      => in_array(strtoupper(trim((string)($fila['deducible'] ?? 'SI'))), ['NO', '0', 'FALSE'], true) ? 0 : 1,
                 'observaciones'  => trim($fila['observaciones'] ?? ''),
+                'uso_en'         => trim($fila['uso_en'] ?? ''),
                 'descripcion'    => $descripcion,
                 'monto'          => $monto,
             ];
@@ -226,6 +227,7 @@ class GastosModel {
                     'anio_declaracion' => (int)date('Y', $primero['fecha_ts']),
                     'estado'           => 'pendiente',
                     'observaciones'    => $primero['observaciones'],
+                    'uso_en'           => $primero['uso_en'],
                     'items'            => $items,
                 ];
                 self::crear($data, $uid);

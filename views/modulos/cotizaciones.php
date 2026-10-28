@@ -11,6 +11,8 @@
           <option value="enviada">Enviada</option>
           <option value="aprobada">Aprobada</option>
           <option value="rechazada">Rechazada</option>
+          <option value="facturada">Facturada</option>
+          <option value="aprobada_cliente">Aprobada Cliente</option>
         </select>
         <button class="btn btn-primary" onclick="abrirModalCotizacionDirecta()">+ Nueva directa</button>
       </div>

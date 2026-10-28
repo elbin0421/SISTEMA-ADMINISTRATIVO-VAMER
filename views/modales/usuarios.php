@@ -20,3 +20,21 @@
     </div>
   </div>
 </div>
+
+<!-- MODAL ROL -->
+<div class="modal-bg" id="modalRol">
+  <div class="modal">
+    <h4 id="tituloRol">Nuevo Rol</h4>
+    <div class="alert alert-error" id="errRol"></div>
+    <input type="hidden" id="rolIdEdit">
+    <div class="form-group"><label>Nombre del rol *</label><input type="text" id="rolNombre" maxlength="50" placeholder="Ej: Supervisor, Recursos Humanos..."></div>
+    <div class="form-group" id="rolCopiarWrap">
+      <label>Copiar permisos de <span style="color:var(--muted);font-size:11px">(opcional)</span></label>
+      <select id="rolCopiarDe"><option value="">— Empezar sin permisos —</option></select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="cerrarModal('modalRol')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarRol()">Guardar</button>
+    </div>
+  </div>
+</div>

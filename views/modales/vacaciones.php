@@ -53,7 +53,7 @@
       <div style="font-size:11px;color:var(--muted);font-weight:600;letter-spacing:.5px;margin-bottom:10px">📅 DÍAS DE VACACIONES</div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-items:end">
         <div><div style="font-size:11px;color:var(--muted);margin-bottom:4px">Días disponibles</div><strong id="vacDiasDisponibles" style="font-size:16px;color:var(--accent)">—</strong></div>
-        <div><label style="display:block;font-size:12px;color:var(--muted);margin-bottom:4px">Días a usar *</label><input type="number" id="vacDiasAUsar" min="1" step="1" value="" style="width:100%;padding:6px 8px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px" oninput="recalcularParcial()"></div>
+        <div><label style="display:block;font-size:12px;color:var(--muted);margin-bottom:4px">Días a usar *</label><input type="number" id="vacDiasAUsar" min="0.01" step="0.01" value="" style="width:100%;padding:6px 8px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px" oninput="recalcularParcial()"></div>
         <div><div style="font-size:11px;color:var(--muted);margin-bottom:4px">Monto estimado</div><strong id="vacMontoParcial" style="font-size:15px;color:#4caf50">—</strong></div>
       </div>
     </div>

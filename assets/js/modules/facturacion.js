@@ -247,11 +247,20 @@ async function confirmarFacturaDirecta() {
     const cant    = parseFloat(document.getElementById('fdCant_'  + idx)?.value);
     const precio  = parseFloat(document.getElementById('fdPrecio_' + idx)?.value);
     const tipo    = document.getElementById('fdTipo_'   + idx)?.value;
-    if (!desc || !cant || !precio || cant <= 0 || precio <= 0) { itemsValidos = false; return; }
+    // Fila totalmente vacía: se ignora
+    const rawCant = document.getElementById('fdCant_' + idx)?.value.trim();
+    const rawPrecio = document.getElementById('fdPrecio_' + idx)?.value.trim();
+    if (!desc && !rawCant && !rawPrecio) return;
+    // El precio puede ser 0 (ítem sin costo); la cantidad debe ser mayor a 0
+    if (!desc || isNaN(cant) || cant <= 0 || isNaN(precio) || precio < 0) { itemsValidos = false; return; }
     items.push({ tipo, descripcion: desc, cantidad: cant, precio_unitario: precio });
   });
   if (items.length === 0 || !itemsValidos) {
-    errEl.textContent = 'Completa todos los ítems (descripción, cantidad y precio son requeridos).';
+    errEl.textContent = 'Completa todos los ítems: descripción y cantidad (mayor a 0) son requeridas; el precio puede ser 0.';
+    errEl.style.display = 'block'; return;
+  }
+  if (items.reduce((t, i) => t + i.cantidad * i.precio_unitario, 0) <= 0) {
+    errEl.textContent = 'El total de la factura debe ser mayor a cero.';
     errEl.style.display = 'block'; return;
   }
 

@@ -92,6 +92,12 @@
         </div>
       </div>
 
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">Uso en</label>
+        <input type="text" id="gastoUsoEn" class="form-control" maxlength="150" style="text-transform:uppercase"
+          placeholder="Ej: TCB1850, TALLER">
+      </div>
+
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
         <div><label class="form-label">Mes declaración *</label>
           <select id="gastoMes" class="form-control">

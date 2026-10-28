@@ -82,7 +82,7 @@ function renderTablaGastos(rows) {
       <td style="vertical-align:top"><strong>${g.nombre_proveedor}</strong><br><code style="font-size:10px;color:var(--muted)">${g.rtn_proveedor||'—'}</code></td>
       <td style="vertical-align:top;font-size:12px;white-space:nowrap">${g.numero_factura||'—'}</td>
       <td style="vertical-align:top"><span class="badge badge-gray">${CATS_GASTOS[g.categoria]||g.categoria}</span></td>
-      <td style="min-width:260px">${itemsHTML}</td>
+      <td style="min-width:260px">${itemsHTML}${g.uso_en ? `<div style="margin-top:4px;font-size:11px;color:var(--muted)">🔧 Uso en: <strong>${g.uso_en}</strong></div>` : ''}</td>
       <td style="text-align:right;vertical-align:top">${fL(g.subtotal)}</td>
       <td style="text-align:right;vertical-align:top">${g.tasa_isv}%/${fL(g.isv)}</td>
       <td style="text-align:right;vertical-align:top;font-weight:700;color:#4caf50">${fL(g.total)}</td>
@@ -143,7 +143,7 @@ function formatearNumDocGasto(el) {
 
 function abrirModalGasto() {
   document.getElementById('modalGastoTitulo').textContent = '🧾 Nuevo Gasto';
-  ['gastoId','gastoNumDoc','gastoRTN','gastoProveedor','gastoObs'].forEach(id => {
+  ['gastoId','gastoNumDoc','gastoRTN','gastoProveedor','gastoObs','gastoUsoEn'].forEach(id => {
     const e = document.getElementById(id); if (e) e.value = '';
   });
   document.getElementById('sugerenciasProveedorGasto').style.display = 'none';
@@ -200,6 +200,7 @@ async function editarGasto(id) {
   document.getElementById('gastoDeducible').checked = !!+g.deducible;
   document.getElementById('gastoEstado').value   = g.estado;
   document.getElementById('gastoObs').value      = g.observaciones || '';
+  document.getElementById('gastoUsoEn').value    = g.uso_en || '';
   document.getElementById('gastoMes').value      = g.mes_declaracion;
   document.getElementById('gastoAnio').value     = g.anio_declaracion;
   document.getElementById('errGasto').style.display = 'none';
@@ -309,6 +310,7 @@ async function guardarGasto() {
     anio_declaracion:parseInt(document.getElementById('gastoAnio').value),
     estado:          document.getElementById('gastoEstado').value,
     observaciones:   document.getElementById('gastoObs').value.trim() || null,
+    uso_en:          document.getElementById('gastoUsoEn').value.trim().toUpperCase() || null,
     items:           itemsValidos.map(it => ({ descripcion: it.descripcion.trim(), cantidad: parseFloat(it.cantidad)||1, monto: parseFloat(it.monto) })),
   };
   const btn = document.getElementById('btnGuardarGasto');
@@ -366,6 +368,7 @@ const MAPEO_COLUMNAS_GASTOS = {
   'tasaisv':               'tasa_isv',
   'deducible':             'deducible',
   'observaciones':         'observaciones',
+  'usoen':                 'uso_en',
 };
 
 function normalizarEncabezadoGasto(s) {
@@ -575,4 +578,43 @@ async function confirmarImportarGastos() {
   }
   cerrarModal('modalImportarGastos');
   cargarGastos();
+}
+
+// ══════════════════════════════════════════════════════════
+// EXPORTAR A EXCEL — detallado, una fila por ítem
+// ══════════════════════════════════════════════════════════
+function exportarGastosExcel() {
+  if (!gastosData.length) { toast('Sin datos.', 'error'); return; }
+  const mes  = document.getElementById('filtroGastoMes')?.value || '';
+  const anio = document.getElementById('filtroGastoAnio')?.value || '';
+  const n2 = v => Math.round(parseFloat(v || 0) * 100) / 100;
+  const headers = ['Fecha','Proveedor','RTN','Tipo Documento','N° Documento','Categoría','Descripción (ítem)','Cantidad','P. Unitario','Subtotal','ISV %','ISV','Total','Uso en','Deducible','Estado','Mes','Año','Observaciones'];
+  const rows = [headers];
+  let tSub = 0, tIsv = 0, tTot = 0;
+  // Una fila por ÍTEM, tal como se ingresó el gasto
+  gastosData.forEach(g => {
+    const items = (g.items && g.items.length) ? g.items
+      : [{ descripcion: g.descripcion, cantidad: 1, monto: g.subtotal, total_item: g.subtotal, isv: g.isv, total: g.total }];
+    items.forEach(it => {
+      const cant = parseFloat(it.cantidad) || 1;
+      const sub  = n2(it.total_item != null ? it.total_item : cant * (parseFloat(it.monto) || 0));
+      const isv  = n2(it.isv);
+      const tot  = n2(it.total != null ? it.total : sub + isv);
+      tSub += sub; tIsv += isv; tTot += tot;
+      rows.push([
+        g.fecha, g.nombre_proveedor, g.rtn_proveedor || '', g.tipo_documento || '', g.numero_factura || '',
+        CATS_GASTOS[g.categoria] || g.categoria, it.descripcion, cant, n2(it.monto), sub,
+        parseInt(g.tasa_isv) || 0, isv, tot, g.uso_en || '', g.deducible ? 'Sí' : 'No', g.estado,
+        MESES_GASTOS[g.mes_declaracion] || g.mes_declaracion, g.anio_declaracion, g.observaciones || ''
+      ]);
+    });
+  });
+  rows.push([]);
+  rows.push(['','','','','','','','','TOTALES', n2(tSub), '', n2(tIsv), n2(tTot)]);
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [11,26,16,12,20,14,38,9,12,12,7,12,12,18,10,10,12,6,28].map(w => ({ wch: w }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Gastos DMC');
+  XLSX.writeFile(wb, `Gastos_DMC${mes ? '_' + MESES_GASTOS[mes] : ''}${anio ? '_' + anio : ''}.xlsx`);
+  toast('Excel generado.', 'success');
 }

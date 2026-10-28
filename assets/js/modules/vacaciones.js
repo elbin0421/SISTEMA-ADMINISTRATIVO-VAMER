@@ -70,12 +70,14 @@ async function cargarResumenVacaciones() {
     if (!rows || !rows.length) { wrap.innerHTML = '<p class="empty-state">Sin empleados activos.</p>'; return; }
 
     const fL = n => 'L. ' + Number(n).toLocaleString('es-HN', {minimumFractionDigits:2});
+    const fD = n => { n = Math.round((+n || 0) * 100) / 100; return Number.isInteger(n) ? n : n.toFixed(2); };
 
     let h = `<table style="font-size:12px">
       <thead><tr>
         <th>Empleado</th>
         <th style="text-align:center">Años</th>
         <th style="text-align:center">Días<br>corresponden</th>
+        <th style="text-align:center">Días<br>proporcionales</th>
         <th style="text-align:center">Días<br>usados</th>
         <th style="text-align:center">Días<br>pendientes</th>
         <th style="text-align:right">Salario<br>Diario</th>
@@ -85,16 +87,15 @@ async function cargarResumenVacaciones() {
 
     rows.forEach(row => {
       const sinIngreso   = !row.fecha_ingreso;
-      const esProporcional = !!row.proporcional;
       const diasUsados   = (+row.dias_descanso || 0) + (+row.dias_pagados || 0);
-      // Los días proporcionales (< 1 año) son un acumulado informativo, no
-      // están disponibles para tomar todavía, así que no cuentan como pendientes.
-      const diasPend     = esProporcional ? 0 : Math.max(0, row.dias_actuales - diasUsados);
+      // Pendientes = días del tramo + días proporcionales del año en curso - días usados
+      const diasPend     = Math.max(0, Math.round(((+row.dias_actuales || 0) - diasUsados) * 100) / 100);
       const colorPend    = diasPend > 0 ? 'color:#ff9800;font-weight:700' : 'color:var(--muted)';
 
-      const badgeDias = esProporcional
-        ? `<strong style="font-size:14px;color:var(--muted)">${row.dias_actuales}</strong><div style="font-size:9px;color:var(--muted)">proporcional · < 1 año</div>`
-        : `<strong style="font-size:16px;color:var(--accent)">${row.dias_actuales}</strong>`;
+      const badgeDias = `<strong style="font-size:16px;color:var(--accent)">${fD(row.dias_tramo)}</strong>${row.proporcional ? '<div style="font-size:9px;color:var(--muted)">< 1 año</div>' : ''}`;
+      const badgeProp = +row.dias_proporcionales > 0
+        ? `<strong style="font-size:14px;color:#4caf50">+${fD(row.dias_proporcionales)}</strong>`
+        : '<span style="color:var(--muted)">—</span>';
 
       h += `<tr>
         <td>
@@ -103,12 +104,13 @@ async function cargarResumenVacaciones() {
         </td>
         <td style="text-align:center">${sinIngreso ? '—' : row.anios_actuales}</td>
         <td style="text-align:center">${badgeDias}</td>
+        <td style="text-align:center">${badgeProp}</td>
         <td style="text-align:center">
           ${diasUsados > 0
-            ? `<span>${diasUsados}</span><div style="font-size:10px;color:var(--muted)">${row.dias_descanso>0?row.dias_descanso+' desc.':''}${row.dias_descanso>0&&row.dias_pagados>0?' / ':''}${row.dias_pagados>0?row.dias_pagados+' pag.':''}</div>`
+            ? `<span>${fD(diasUsados)}</span><div style="font-size:10px;color:var(--muted)">${row.dias_descanso>0?fD(row.dias_descanso)+' desc.':''}${row.dias_descanso>0&&row.dias_pagados>0?' / ':''}${row.dias_pagados>0?fD(row.dias_pagados)+' pag.':''}</div>`
             : '<span style="color:var(--muted)">—</span>'}
         </td>
-        <td style="text-align:center"><span style="${colorPend}">${diasPend}</span></td>
+        <td style="text-align:center"><span style="${colorPend}">${fD(diasPend)}</span></td>
         <td style="text-align:right">${fL(row.salario_diario)}</td>
         <td style="text-align:right;color:#4caf50">${fL(row.monto_actual)}</td>
         <td style="text-align:right">${row.monto_total_pagado > 0 ? fL(row.monto_total_pagado) : '—'}</td>
@@ -177,7 +179,7 @@ function renderTablaVacHistorial(rows) {
       <td><strong>${v.empleado}</strong><div style="font-size:11px;color:var(--muted)">${v.puesto||''}</div></td>
       <td style="font-size:12px">${v.fecha_inicio} → ${v.fecha_fin}</td>
       <td style="text-align:center">${v.anios_laborados}</td>
-      <td style="text-align:center"><strong style="color:var(--accent)">${v.dias_correspondientes}</strong></td>
+      <td style="text-align:center"><strong style="color:var(--accent)">${parseFloat(v.dias_correspondientes)}</strong></td>
       <td style="text-align:center">${tipoBadge}</td>
       <td style="text-align:right">${monto}</td>
       <td style="font-size:12px">${v.fecha_registro}</td>
@@ -226,7 +228,7 @@ async function abrirModalVacacion(empId = null, modoEditar = false, datosEditar 
   document.getElementById('btnGuardarVacacion').textContent=modoEditar?'Guardar Cambios':'Registrar Vacaciones';
 
   if (modoEditar && datosEditar) {
-    vacEditandoDiasOriginal=parseInt(datosEditar.dias_correspondientes)||0;
+    vacEditandoDiasOriginal=parseFloat(datosEditar.dias_correspondientes)||0;
     sel.value=datosEditar.empleado_id;
     document.getElementById('vacFechaInicio').value=datosEditar.fecha_inicio;
     document.getElementById('vacFechaFin').value=datosEditar.fecha_fin;
@@ -237,7 +239,7 @@ async function abrirModalVacacion(empId = null, modoEditar = false, datosEditar 
     const fLv=n=>'L. '+Number(n||0).toLocaleString('es-HN',{minimumFractionDigits:2});
     const c=rCalc.ok?rCalc.data.calculo:{};
     let diasPend=0,diasAct=0;
-    if(rRes.ok){const er=rRes.data.data.find(e=>e.id_empleado==datosEditar.empleado_id);if(er){diasAct=+er.dias_actuales||0;const du=(+er.dias_descanso||0)+(+er.dias_pagados||0);diasPend=Math.max(0,diasAct-du);}}
+    if(rRes.ok){const er=rRes.data.data.find(e=>e.id_empleado==datosEditar.empleado_id);if(er){diasAct=+er.dias_actuales||0;const du=(+er.dias_descanso||0)+(+er.dias_pagados||0);diasPend=Math.max(0,Math.round((diasAct-du)*100)/100);}}
     const pool=diasPend+vacEditandoDiasOriginal;
     vacCalculo={...c,dias_correspondientes:diasAct||c.dias_correspondientes||vacEditandoDiasOriginal,dias_disponibles:pool,salario_diario:c.salario_diario||0};
     document.getElementById('vacPreviewCalculo').style.display='';
@@ -307,9 +309,10 @@ async function calcularPreviewVac() {
     const fL  = n => 'L. ' + Number(n).toLocaleString('es-HN', {minimumFractionDigits:2});
 
     document.getElementById('vacAnios').textContent   = c.anios_laborados + ' años';
+    const fDv = n => { n = Math.round((+n || 0) * 100) / 100; return Number.isInteger(n) ? n : n.toFixed(2); };
     document.getElementById('vacDias').textContent    = c.aplica
-      ? c.dias_correspondientes + ' días'
-      : (c.proporcional ? c.dias_correspondientes + ' días (proporcional, aún no disponibles)' : 'Sin derecho');
+      ? fDv(c.dias_correspondientes) + ' días' + ((+c.dias_proporcionales > 0) ? ` (${fDv(c.dias_tramo)} + ${fDv(c.dias_proporcionales)} proporcionales)` : '')
+      : 'Sin días acumulados';
     document.getElementById('vacSDiario').textContent = fL(c.salario_diario);
     document.getElementById('vacMonto').textContent   = fL(c.monto_vacaciones);
 
@@ -319,7 +322,7 @@ async function calcularPreviewVac() {
       const empRow = rResumen.data.data.find(e => e.id_empleado == empId);
       if (empRow) {
         const usados=(+empRow.dias_descanso||0)+(+empRow.dias_pagados||0);
-        const disponibles=Math.max(0,c.dias_correspondientes-usados);
+        const disponibles=Math.max(0,Math.round((c.dias_correspondientes-usados)*100)/100);
         if(!vacEditandoDiasOriginal){
           vacCalculo.dias_disponibles=disponibles;
           const _ddc=document.getElementById('vacDiasDisponibles');if(_ddc)_ddc.textContent=disponibles+' días';
@@ -343,10 +346,10 @@ function recalcularParcial() {
   const fL         = n => 'L. ' + Number(n).toLocaleString('es-HN', {minimumFractionDigits:2});
   const inputDias  = document.getElementById('vacDiasAUsar');
   const maxDias    = vacCalculo.dias_disponibles ?? vacCalculo.dias_correspondientes;
-  let diasAUsar    = parseInt(inputDias.value) || maxDias;
+  let diasAUsar    = Math.round((parseFloat(inputDias.value) || maxDias) * 100) / 100;
 
-  // Validar rango
-  if (diasAUsar < 1) diasAUsar = 1;
+  // Validar rango (se permiten días con decimales por los proporcionales)
+  if (diasAUsar <= 0) diasAUsar = maxDias;
   if (diasAUsar > maxDias) { diasAUsar = maxDias; inputDias.value = maxDias; }
 
   const montoParcial=vacCalculo.salario_diario*diasAUsar;
@@ -354,7 +357,7 @@ function recalcularParcial() {
   const _mp2=document.getElementById('vacMontoParcial');if(_mp2)_mp2.textContent=fL(montoParcial);
   // "Días disponibles" siempre muestra el total pendiente real (maxDias).
   // Solo si el usuario usa una cantidad parcial, se aclara cuántos quedarán después.
-  const dispShow=Math.max(0,maxDias-diasAUsar);
+  const dispShow=Math.max(0,Math.round((maxDias-diasAUsar)*100)/100);
   const _dd2=document.getElementById('vacDiasDisponibles');
   if(_dd2){
     _dd2.textContent = maxDias + (maxDias===1?' día':' días') + (diasAUsar<maxDias ? ` (quedarán ${dispShow})` : '');
@@ -383,7 +386,7 @@ async function guardarVacacion() {
 
   const id       = document.getElementById('vacId').value;
   const diasInput = document.getElementById('vacDiasAUsar');
-  const diasAUsar = parseInt(diasInput?.value) || (vacCalculo?.dias_correspondientes ?? 0);
+  const diasAUsar = Math.round((parseFloat(diasInput?.value) || (vacCalculo?.dias_correspondientes ?? 0)) * 100) / 100;
 
   const body = {
     empleado_id:    +document.getElementById('vacEmpleadoId').value,

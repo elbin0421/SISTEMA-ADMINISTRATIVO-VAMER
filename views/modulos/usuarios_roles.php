@@ -7,7 +7,7 @@
 
 <div class="module" id="mod-roles">
   <div class="card">
-    <div class="card-header"><h4>🔑 Roles y Permisos</h4></div>
+    <div class="card-header"><h4>🔑 Roles y Permisos</h4><button class="btn btn-primary" onclick="abrirModalRol()">+ Nuevo Rol</button></div>
     <div id="rolesWrap"><p class="loading">Cargando...</p></div>
   </div>
 </div>

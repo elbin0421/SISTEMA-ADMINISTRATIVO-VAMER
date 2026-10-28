@@ -18,6 +18,9 @@ match(true) {
     $action === 'listar'           && $method === 'GET'  => listar(),
     $action === 'permisos'         && $method === 'GET'  => obtenerPermisos(),
     $action === 'guardar_permisos' && $method === 'POST' => guardarPermisos($sesion),
+    $action === 'crear'            && $method === 'POST' => crearRol($sesion),
+    $action === 'renombrar'        && $method === 'POST' => renombrarRol($sesion),
+    $action === 'eliminar'         && $method === 'POST' => eliminarRol($sesion),
     default => responder(400, ['error' => 'Accion no valida'])
 };
 
@@ -40,6 +43,31 @@ function guardarPermisos(array $sesion): void {
     }
     RolModel::guardarPermisos($rol_id, $perms);
     responder(200, ['ok' => true]);
+}
+
+function crearRol(array $sesion): void {
+    requirePermiso($sesion['rol_id'], 'roles', 'puede_crear');
+    $d = json_decode(file_get_contents('php://input'), true) ?? [];
+    try {
+        $id = RolModel::crear((string)($d['nombre'] ?? ''), (int)($d['copiar_de'] ?? 0));
+        responder(201, ['ok' => true, 'id' => $id]);
+    } catch (Exception $e) { responder(400, ['error' => $e->getMessage()]); }
+}
+function renombrarRol(array $sesion): void {
+    requirePermiso($sesion['rol_id'], 'roles', 'puede_editar');
+    $d = json_decode(file_get_contents('php://input'), true) ?? [];
+    try {
+        RolModel::renombrar((int)($d['id'] ?? 0), (string)($d['nombre'] ?? ''));
+        responder(200, ['ok' => true]);
+    } catch (Exception $e) { responder(400, ['error' => $e->getMessage()]); }
+}
+function eliminarRol(array $sesion): void {
+    requirePermiso($sesion['rol_id'], 'roles', 'puede_eliminar');
+    $d = json_decode(file_get_contents('php://input'), true) ?? [];
+    try {
+        RolModel::eliminar((int)($d['id'] ?? 0));
+        responder(200, ['ok' => true]);
+    } catch (Exception $e) { responder(400, ['error' => $e->getMessage()]); }
 }
 
 function responder(int $code, array $data): void {

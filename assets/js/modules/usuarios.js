@@ -87,7 +87,9 @@ async function cargarRoles() {
   for (const rol of rolesCache) {
     const pr=await api('controllers/RolesController.php?action=permisos&rol_id='+rol.id_rol);
     const pm={}; (pr.ok?pr.data.data:[]).forEach(p=>{pm[p.modulo]=p;});
-    html+=`<div style="margin-bottom:22px"><h5 style="color:var(--accent);margin-bottom:10px;font-size:13px">🔑 ${rol.nombre}</h5>
+    const nomRol=String(rol.nombre).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const accionesRol=rol.id_rol==1?'':` <button class="btn btn-sm btn-secondary" onclick="abrirModalRol(${rol.id_rol})">✏️ Renombrar</button> <button class="btn btn-sm btn-danger" onclick="eliminarRol(${rol.id_rol})">🗑️ Eliminar</button>`;
+    html+=`<div style="margin-bottom:22px"><h5 style="color:var(--accent);margin-bottom:10px;font-size:13px">🔑 ${nomRol}${accionesRol}</h5>
     <div class="permisos-wrap" style="overflow-x:auto"><table style="min-width:380px"><thead><tr><th>Módulo</th><th style="text-align:center">Ver</th><th style="text-align:center">Crear</th><th style="text-align:center">Editar</th><th style="text-align:center">Eliminar</th></tr></thead><tbody>`;
     MODULOS.forEach(mod=>{
       const p=pm[mod]||{}; ['puede_ver','puede_crear','puede_editar','puede_eliminar'].forEach(a=>{if(!p[a])p[a]=0;});
@@ -96,6 +98,34 @@ async function cargarRoles() {
     html+=`</tbody></table></div><button class="btn btn-sm btn-primary" style="margin-top:8px" onclick="guardarPermisos(${rol.id_rol})">💾 Guardar permisos de ${rol.nombre}</button><hr style="border-color:var(--border);margin-top:18px"></div>`;
   }
   document.getElementById('rolesWrap').innerHTML=html;
+}
+function abrirModalRol(id=0) {
+  document.getElementById('errRol').style.display='none';
+  document.getElementById('rolIdEdit').value=id||'';
+  document.getElementById('tituloRol').textContent=id?'Renombrar Rol':'Nuevo Rol';
+  document.getElementById('rolNombre').value=id?(rolesCache.find(r=>r.id_rol==id)?.nombre||''):'';
+  document.getElementById('rolCopiarWrap').style.display=id?'none':'';
+  document.getElementById('rolCopiarDe').innerHTML='<option value="">— Empezar sin permisos —</option>'+rolesCache.map(r=>`<option value="${r.id_rol}">${r.nombre}</option>`).join('');
+  abrirModal('modalRol');
+}
+async function guardarRol() {
+  const err=document.getElementById('errRol'); err.style.display='none';
+  const id=document.getElementById('rolIdEdit').value;
+  const nombre=document.getElementById('rolNombre').value.trim();
+  const body=id?{id:+id,nombre}:{nombre,copiar_de:+document.getElementById('rolCopiarDe').value||0};
+  const r=await api('controllers/RolesController.php?action='+(id?'renombrar':'crear'),{method:'POST',body:JSON.stringify(body)});
+  if(!r.ok){err.textContent=r.data.error||'Error al guardar.';err.style.display='block';return;}
+  cerrarModal('modalRol');
+  toast(id?'Rol actualizado.':'Rol creado. Ajusta sus permisos y guarda.');
+  rolesCache=[]; await cargarRoles();
+}
+async function eliminarRol(id) {
+  const rol=rolesCache.find(r=>r.id_rol==id);
+  if(!await confirmDialog(`¿Eliminar el rol "${rol?.nombre||''}" y sus permisos?`))return;
+  const r=await api('controllers/RolesController.php?action=eliminar',{method:'POST',body:JSON.stringify({id})});
+  if(!r.ok){toast(r.data.error||'No se pudo eliminar.','error');return;}
+  toast('Rol eliminado.');
+  rolesCache=[]; await cargarRoles();
 }
 async function guardarPermisos(rol_id) {
   const pm={};

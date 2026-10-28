@@ -397,8 +397,6 @@ function exportarRequisicionesExcel() {
   toast('Excel generado.','success');
 }
 
-function exportarGastosExcel(){if(!gastosData.length){toast('Sin datos.','error');return;}const mes=document.getElementById('filtroGastoMes')?.value||'';const anio=document.getElementById('filtroGastoAnio')?.value||'';const fN=n=>Number(n||0).toFixed(2);const rows=[['Fecha','Proveedor','RTN','N° Documento','Categoría','Descripción','Subtotal','ISV %','ISV','Total','Deducible','Estado','Mes','Año'],...gastosData.map(g=>[g.fecha,g.nombre_proveedor,g.rtn_proveedor||'',g.numero_factura||'',CATS_GASTOS[g.categoria]||g.categoria,g.descripcion,fN(g.subtotal),g.tasa_isv,fN(g.isv),fN(g.total),g.deducible?'Sí':'No',g.estado,MESES_GASTOS[g.mes_declaracion]||g.mes_declaracion,g.anio_declaracion])];const ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=[10,25,16,20,14,30,12,8,12,12,10,10,12,6].map(w=>({wch:w}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Gastos DMC');XLSX.writeFile(wb,`Gastos_DMC${mes?'_'+MESES_GASTOS[mes]:''}${anio?'_'+anio:''}.xlsx`);toast('Excel generado.','success');}
-
 async function exportarCotizacionExcel(id) {
   try {
     const r = await api('controllers/CotizacionesController.php?action=obtener&id=' + id);
