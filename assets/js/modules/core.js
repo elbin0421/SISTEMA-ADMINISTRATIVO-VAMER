@@ -96,7 +96,7 @@ function updateClock() {
 updateClock(); setInterval(updateClock, 1000);
 
 // ── NAVEGACIÓN ───────────────────────────────────────────────
-const modTitles = { inicio:'Inicio', clientes:'Clientes', vehiculos:'Vehículos', inventario:'Inventario', requisiciones:'Requisiciones de Materiales', compras:'Compras', proveedores:'Proveedores', ordenes:'Órdenes de Trabajo', usuarios:'Usuarios', roles:'Roles y Permisos', cotizaciones:'Cotizaciones', movimientos:'Movimientos', catalogo:'Catálogo de Precios', facturacion:'Facturación', libro_ventas:'Libro de Ventas', vacaciones:'Vacaciones', recibos:'Recibos', asistencia:'Tiempo Extra y Días Faltados', gastos:'Gastos DMC / SAR Honduras' };
+const modTitles = { inicio:'Inicio', clientes:'Clientes', vehiculos:'Vehículos', inventario:'Inventario', requisiciones:'Requisiciones de Materiales', compras:'Compras', proveedores:'Proveedores', ordenes:'Órdenes de Trabajo', usuarios:'Usuarios', roles:'Roles y Permisos', cotizaciones:'Cotizaciones', movimientos:'Movimientos', catalogo:'Catálogo de Precios', facturacion:'Facturación', libro_ventas:'Libro de Ventas', vacaciones:'Vacaciones', recibos:'Recibos', asistencia:'Tiempo Extra y Días Faltados', marcaciones:'Asistencia Diaria', gastos:'Gastos DMC / SAR Honduras' };
 document.querySelectorAll('.nav-item[data-module]').forEach(el => {
   el.addEventListener('click', function() {
     const mod = this.dataset.module;
@@ -122,6 +122,7 @@ document.querySelectorAll('.nav-item[data-module]').forEach(el => {
       vacaciones: () => { if (typeof cargarVacaciones=== 'function') cargarVacaciones(); },
       recibos:   () => { if (typeof cargarRecibos === 'function') cargarRecibos(); },
       asistencia: () => { if (typeof cargarAsistencia === 'function') cargarAsistencia(); },
+      marcaciones: () => { if (typeof cargarMarcaciones === 'function') cargarMarcaciones(); },
       gastos: () => { initFiltrosGastos(); cargarGastos(); },
       reportes:  () => {},
       cai:       () => cargarModuloCAI(),

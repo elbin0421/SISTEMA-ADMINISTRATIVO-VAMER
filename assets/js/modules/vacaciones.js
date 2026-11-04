@@ -208,11 +208,13 @@ async function abrirModalVacacion(empId = null, modoEditar = false, datosEditar 
   document.querySelector('#modalVacacion h4').textContent = modoEditar ? '✏️ Editar Vacaciones' : '🏖️ Registrar Vacaciones';
   document.getElementById('vacId').value = modoEditar && datosEditar ? datosEditar.id_vacacion : '';
 
-  // Llenar select empleados
+  // Buscador de empleados (en edición no se cambia el empleado)
   const sel = document.getElementById('vacEmpleadoId');
-  sel.innerHTML = '<option value="">— Seleccionar empleado —</option>' +
-    vacEmpleadosCache.map(e => `<option value="${e.id_empleado}">${e.nombre}</option>`).join('');
-  sel.disabled = modoEditar; // en edición no se cambia el empleado
+  sel.value = '';
+  const buscar = document.getElementById('vacEmpleadoBuscar');
+  buscar.value = '';
+  buscar.disabled = modoEditar;
+  document.getElementById('vacEmpleadoSug').style.display = 'none';
 
   // Reset / llenar según modo
   vacCalculo=null;vacEditandoDiasOriginal=0;
@@ -229,7 +231,7 @@ async function abrirModalVacacion(empId = null, modoEditar = false, datosEditar 
 
   if (modoEditar && datosEditar) {
     vacEditandoDiasOriginal=parseFloat(datosEditar.dias_correspondientes)||0;
-    sel.value=datosEditar.empleado_id;
+    seleccionarEmpleadoVac(datosEditar.empleado_id, false);
     document.getElementById('vacFechaInicio').value=datosEditar.fecha_inicio;
     document.getElementById('vacFechaFin').value=datosEditar.fecha_fin;
     document.getElementById('vacFechaRegistro').value=datosEditar.fecha_registro;
@@ -252,7 +254,7 @@ async function abrirModalVacacion(empId = null, modoEditar = false, datosEditar 
     recalcularParcial();onTipoVacChange();
     document.getElementById('btnGuardarVacacion').disabled=false;
   } else {
-    if (empId) sel.value = empId;
+    if (empId) seleccionarEmpleadoVac(empId, false);
     document.getElementById('vacFechaInicio').value   = '';
     document.getElementById('vacFechaFin').value      = new Date().toISOString().slice(0,10);
     document.getElementById('vacFechaRegistro').value = new Date().toISOString().slice(0,10);
@@ -268,6 +270,52 @@ async function editarVacacion(id) {
   const r = await api('controllers/VacacionesController.php?action=obtener&id=' + id);
   if (!r.ok) { toast('Error al cargar registro.', 'error'); return; }
   await abrirModalVacacion(null, true, r.data.data);
+}
+
+// ── Buscador de empleado ──────────────────────────────────────
+function _normVac(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+
+function buscarEmpleadoVac() {
+  const inp = document.getElementById('vacEmpleadoBuscar');
+  const box = document.getElementById('vacEmpleadoSug');
+  if (inp.disabled) return;
+  const q = _normVac(inp.value.trim());
+  // Si el usuario modifica el texto, se invalida la selección anterior
+  const actual = vacEmpleadosCache.find(e => e.id_empleado == document.getElementById('vacEmpleadoId').value);
+  if (actual && _normVac(actual.nombre) !== q) {
+    document.getElementById('vacEmpleadoId').value = '';
+    document.getElementById('vacInfoEmpleado').style.display = 'none';
+    document.getElementById('vacPreviewCalculo').style.display = 'none';
+    const pan = document.getElementById('vacPanelDiasAUsar'); if (pan) pan.style.display = 'none';
+    document.getElementById('btnGuardarVacacion').disabled = true;
+  }
+  const res = vacEmpleadosCache
+    .filter(e => !q || _normVac(e.nombre).includes(q) || _normVac(e.identidad).includes(q))
+    .slice(0, 10);
+  if (!res.length) {
+    box.innerHTML = '<div style="padding:8px 12px;font-size:12px;color:var(--muted)">Sin resultados</div>';
+  } else {
+    box.innerHTML = res.map(e => `<div onmousedown="seleccionarEmpleadoVac(${e.id_empleado})"
+      style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)"
+      onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">
+      <strong>${e.nombre}</strong><div style="font-size:11px;color:var(--muted)">${e.puesto || ''}${e.identidad ? ' · ' + e.identidad : ''}</div></div>`).join('');
+  }
+  box.style.display = '';
+}
+
+function seleccionarEmpleadoVac(id, disparar = true) {
+  const emp = vacEmpleadosCache.find(e => e.id_empleado == id);
+  if (!emp) return;
+  document.getElementById('vacEmpleadoId').value = emp.id_empleado;
+  document.getElementById('vacEmpleadoBuscar').value = emp.nombre;
+  document.getElementById('vacEmpleadoSug').style.display = 'none';
+  if (disparar) {
+    // Empleado distinto: limpiar el inicio del período para que se prellene con su fecha de ingreso
+    if (!document.getElementById('vacId').value) document.getElementById('vacFechaInicio').value = '';
+    vacEditandoDiasOriginal = 0;
+    const di = document.getElementById('vacDiasAUsar'); if (di) di.value = '';
+    onCambioEmpleadoVac();
+  }
 }
 
 function onCambioEmpleadoVac() {

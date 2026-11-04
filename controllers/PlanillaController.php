@@ -24,6 +24,7 @@ match(true) {
     $action === 'recibos_de_planilla' && $method === 'GET' => recibosDePlanilla(),
     $action === 'asistencia_pendiente' && $method === 'GET' => asistenciaPendiente(),
     $action === 'asistencia_de_planilla' && $method === 'GET' => responder(200, ['ok' => true, 'data' => AsistenciaModel::dePlanilla((int)($_GET['id'] ?? 0))]),
+    $action === 'resumen_mensual' && $method === 'GET' => resumenMensual(),
     $action === 'generar'       && $method === 'POST' => generar($sesion),
     $action === 'cerrar'        && $method === 'POST' => cerrar($sesion),
     $action === 'eliminar'      && $method === 'POST' => eliminar($sesion),
@@ -48,6 +49,12 @@ function previsualizar(): void {
     try {
         responder(200, ['ok' => true, 'data' => PlanillaModel::previsualizar($mes, $anio, $quincena, [], $empresa_id)]);
     } catch (Exception $e) { responder(400, ['error' => $e->getMessage()]); }
+}
+function resumenMensual(): void {
+    $mes  = (int)($_GET['mes']  ?? date('n'));
+    $anio = (int)($_GET['anio'] ?? date('Y'));
+    if ($mes < 1 || $mes > 12 || $anio < 2000) { responder(400, ['error' => 'Mes o año inválido']); return; }
+    responder(200, ['ok' => true, 'data' => PlanillaModel::resumenMensual($mes, $anio, (int)($_GET['empresa_id'] ?? 0))]);
 }
 function recibosPendientes(): void {
     $hasta = $_GET['hasta'] ?? date('Y-m-d');

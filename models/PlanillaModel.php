@@ -256,6 +256,77 @@ class PlanillaModel {
         return $planilla;
     }
 
+    /**
+     * Resumen mensual: consolida la 1ra y 2da quincena de un mes, por empleado.
+     */
+    public static function resumenMensual(int $mes, int $anio, int $empresa_id = 0): array {
+        $pdo = getDB();
+        $sql = "SELECT p.id_planilla, p.quincena, p.estado, p.empresa_id, p.total_neto,
+                       emp.nombre AS empresa_nombre
+                FROM planillas p
+                LEFT JOIN empresas emp ON emp.id_empresa = p.empresa_id
+                WHERE p.periodo_mes = ? AND p.periodo_anio = ? AND p.quincena IN ('1ra','2da')";
+        $params = [$mes, $anio];
+        if ($empresa_id) { $sql .= ' AND p.empresa_id = ?'; $params[] = $empresa_id; }
+        $sql .= ' ORDER BY p.quincena, p.id_planilla';
+        $st = $pdo->prepare($sql); $st->execute($params);
+        $planillas = $st->fetchAll();
+
+        $filas = [];
+        if ($planillas) {
+            $ids = array_column($planillas, 'id_planilla');
+            $in  = implode(',', array_fill(0, count($ids), '?'));
+            $q = $pdo->prepare("
+                SELECT dp.*, p.quincena,
+                       CONCAT(e.nombres,' ',e.apellidos) AS empleado, e.puesto, e.ubicacion
+                FROM detalle_planilla dp
+                JOIN planillas p  ON p.id_planilla = dp.planilla_id
+                JOIN empleados e  ON e.id_empleado = dp.empleado_id
+                WHERE dp.planilla_id IN ($in)
+                ORDER BY e.ubicacion, e.apellidos, e.nombres");
+            $q->execute($ids);
+            foreach ($q->fetchAll() as $d) {
+                $k = (int)$d['empleado_id'];
+                if (!isset($filas[$k])) {
+                    $filas[$k] = [
+                        'empleado_id' => $k, 'empleado' => $d['empleado'], 'puesto' => $d['puesto'], 'ubicacion' => $d['ubicacion'],
+                        'neto_1ra' => null, 'neto_2da' => null,
+                        'salario_base' => 0, 'horas_extra' => 0, 'monto_horas_extra' => 0, 'viaticos' => 0,
+                        'dias_faltados' => 0, 'monto_dias_faltados' => 0, 'seguro_privado' => 0,
+                        'abono_prestamo' => 0, 'abono_vale' => 0, 'total_deducciones' => 0, 'salario_neto' => 0,
+                    ];
+                }
+                $f = &$filas[$k];
+                $f['neto_' . $d['quincena']] = round(($f['neto_' . $d['quincena']] ?? 0) + (float)$d['salario_neto'], 2);
+                $f['salario_base']        += (float)$d['salario_base'];
+                $f['horas_extra']         += (float)$d['horas_extra'];
+                $f['monto_horas_extra']   += (float)$d['monto_horas_extra'];
+                $f['viaticos']            += (float)$d['viatico_s1'] + (float)$d['viatico_s2'] + (float)$d['viatico_s3'] + (float)$d['viatico_s4'];
+                $f['dias_faltados']       += (float)$d['dias_faltados'];
+                $f['monto_dias_faltados'] += (float)$d['monto_dias_faltados'];
+                $f['seguro_privado']      += (float)$d['seguro_privado'];
+                $f['abono_prestamo']      += (float)$d['abono_prestamo'];
+                $f['abono_vale']          += (float)$d['abono_vale'];
+                $f['total_deducciones']   += (float)$d['total_deducciones'];
+                $f['salario_neto']        += (float)$d['salario_neto'];
+                unset($f);
+            }
+        }
+        $filas = array_values($filas);
+        $campos = ['salario_base','horas_extra','monto_horas_extra','viaticos','dias_faltados','monto_dias_faltados',
+                   'seguro_privado','abono_prestamo','abono_vale','total_deducciones','salario_neto'];
+        $totales = array_fill_keys($campos, 0);
+        $totales['neto_1ra'] = 0; $totales['neto_2da'] = 0;
+        foreach ($filas as &$f) {
+            foreach ($campos as $c) { $f[$c] = round($f[$c], 2); $totales[$c] += $f[$c]; }
+            $totales['neto_1ra'] += (float)$f['neto_1ra']; $totales['neto_2da'] += (float)$f['neto_2da'];
+        }
+        unset($f);
+        foreach ($totales as $c => $v) $totales[$c] = round($v, 2);
+
+        return ['planillas' => $planillas, 'filas' => $filas, 'totales' => $totales];
+    }
+
     public static function cerrar(int $id): bool {
         return getDB()->prepare("UPDATE planillas SET estado='cerrada' WHERE id_planilla=?")
             ->execute([$id]);

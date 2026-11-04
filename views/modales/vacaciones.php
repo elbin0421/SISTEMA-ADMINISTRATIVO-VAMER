@@ -8,11 +8,12 @@
     <input type="hidden" id="vacId">
 
     <!-- Empleado -->
-    <div class="form-group">
+    <div class="form-group" style="position:relative">
       <label>Empleado *</label>
-      <select id="vacEmpleadoId" onchange="onCambioEmpleadoVac()">
-        <option value="">— Seleccionar empleado —</option>
-      </select>
+      <input type="hidden" id="vacEmpleadoId">
+      <input type="text" id="vacEmpleadoBuscar" placeholder="🔍 Buscar empleado por nombre o identidad..." autocomplete="off"
+        oninput="buscarEmpleadoVac()" onfocus="buscarEmpleadoVac()" onblur="setTimeout(()=>{const s=document.getElementById('vacEmpleadoSug');if(s)s.style.display='none'},180)">
+      <div id="vacEmpleadoSug" style="display:none;position:absolute;left:0;right:0;z-index:50;background:var(--surface,var(--bg));border:1px solid var(--border);border-radius:6px;margin-top:2px;max-height:200px;overflow-y:auto;box-shadow:0 6px 18px rgba(0,0,0,.35)"></div>
     </div>
 
     <!-- Info empleado -->

@@ -33,6 +33,7 @@ $moduloPermiso = [
     'vacaciones'    => 'vacaciones',
     'recibos'       => 'recibos',
     'asistencia'    => 'asistencia',
+    'marcaciones'   => 'marcaciones',
     'reportes'      => 'reportes',
 ];
 
@@ -53,7 +54,6 @@ function puedeVerModulo(string $dataModule) {
   <title><?= (defined('ENTORNO') && ENTORNO === 'pruebas') ? '[PRUEBAS] ' : '' ?>VAMER — Dashboard</title>
   <link rel="stylesheet" href="assets/css/dashboard.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <link rel="icon" type="image" href="assets/img/VAMER1.png">
 </head>
 <body>
 <?php if (defined('ENTORNO') && ENTORNO === 'pruebas'): ?>
@@ -143,7 +143,7 @@ function puedeVerModulo(string $dataModule) {
     <?php endif; ?>
 
     <!-- ── 4. RRHH ── -->
-    <?php if (puedeVerModulo('planillas') || puedeVerModulo('vacaciones') || puedeVerModulo('recibos') || puedeVerModulo('asistencia')): ?>
+    <?php if (puedeVerModulo('planillas') || puedeVerModulo('vacaciones') || puedeVerModulo('recibos') || puedeVerModulo('asistencia') || puedeVerModulo('marcaciones')): ?>
     <div class="nav-group" id="grp-rrhh">
       <div class="nav-group-header" onclick="toggleGrupo('rrhh')" title="RRHH">
         <span class="nav-icon">👷</span>
@@ -155,6 +155,7 @@ function puedeVerModulo(string $dataModule) {
         <?php if (puedeVerModulo('vacaciones')): ?><a class="nav-item" data-module="vacaciones" title="Vacaciones"><span class="nav-icon">🏖️</span><span class="nav-text">Vacaciones</span></a><?php endif; ?>
         <?php if (puedeVerModulo('recibos')): ?><a class="nav-item" data-module="recibos" title="Recibos"><span class="nav-icon">🧾</span><span class="nav-text">Recibos</span></a><?php endif; ?>
         <?php if (puedeVerModulo('asistencia')): ?><a class="nav-item" data-module="asistencia" title="Tiempo Extra y Faltas"><span class="nav-icon">🕒</span><span class="nav-text">Tiempo Extra y Faltas</span></a><?php endif; ?>
+        <?php if (puedeVerModulo('marcaciones')): ?><a class="nav-item" data-module="marcaciones" title="Asistencia Diaria"><span class="nav-icon">🕘</span><span class="nav-text">Asistencia Diaria</span></a><?php endif; ?>
       </div>
     </div>
     <?php endif; ?>
@@ -203,7 +204,7 @@ function puedeVerModulo(string $dataModule) {
     $modulos = [
       'inicio','clientes','vehiculos','inventario','requisiciones','compras','proveedores',
       'ordenes','cotizaciones','movimientos','catalogo','facturacion','cai','libro_ventas',
-      'pagos','planillas','vacaciones','recibos','asistencia','gastos','reportes','usuarios_roles',
+      'pagos','planillas','vacaciones','recibos','asistencia','marcaciones','gastos','reportes','usuarios_roles',
     ];
     foreach ($modulos as $mod) {
       $f = __DIR__ . "/views/modulos/{$mod}.php";
@@ -213,7 +214,7 @@ function puedeVerModulo(string $dataModule) {
     $modales = [
       'clientes','vehiculos','inventario','compras_proveedores',
       'ordenes','cotizaciones','movimientos','catalogo_precios','facturacion',
-      'pagos','planillas','planillas_especiales','vacaciones','recibos','asistencia','gastos','usuarios','requisicion',
+      'pagos','planillas','planillas_especiales','vacaciones','recibos','asistencia','marcaciones','gastos','usuarios','requisicion',
     ];
     foreach ($modales as $modal) {
       $f = __DIR__ . "/views/modales/{$modal}.php";
@@ -256,6 +257,7 @@ function puedeVerModulo(string $dataModule) {
 <script src="assets/js/modules/vacaciones.js"></script>
 <script src="assets/js/modules/recibos.js"></script>
 <script src="assets/js/modules/asistencia.js"></script>
+<script src="assets/js/modules/marcaciones.js"></script>
 <script src="assets/js/modules/movimientos.js"></script>
 <script src="assets/js/modules/gastos.js"></script>
 <script src="assets/js/modules/catalogo.js"></script>

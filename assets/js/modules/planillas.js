@@ -680,12 +680,15 @@ function switchTabPlanilla(tab) {
   document.getElementById('tabEmpleados').classList.toggle('active',  tab==='empleados');
   document.getElementById('tabPlanillas').classList.toggle('active',  tab==='planillas');
   document.getElementById('tabEspeciales').classList.toggle('active', tab==='especiales');
+  document.getElementById('tabResumen').classList.toggle('active',    tab==='resumen');
+  document.getElementById('panelResumen').style.display    = tab==='resumen'    ? '' : 'none';
   document.getElementById('panelEmpleados').style.display  = tab==='empleados'  ? '' : 'none';
   document.getElementById('panelPlanillas').style.display  = tab==='planillas'  ? '' : 'none';
   document.getElementById('panelEspeciales').style.display = tab==='especiales' ? '' : 'none';
   if (tab==='planillas')  cargarPlanillas();
   if (tab==='empleados' && !empleadosData.length) cargarEmpleados();
   if (tab==='especiales') cargarEspeciales();
+  if (tab==='resumen')    initResumenMensual();
 }
 
 
@@ -961,5 +964,132 @@ async function verDetalleEspecial(id) {
     <button class="btn btn-secondary" onclick="cerrarModal('modalDetalleEspecial')">Cerrar</button>
     <a href="controllers/ReportesController.php?action=boucher_todos_pdf&id=${id}" target="_blank" class="btn btn-primary">🧾 Generar Todos los Bouchers</a>
     ${p.estado==='borrador'?`<button class="btn btn-primary" onclick="cerrarModal('modalDetalleEspecial');cerrarEspecial(${id})">✓ Cerrar Planilla</button>`:''}`;
+}
+
+
+// ══════════════════════════════════════════════════════════
+// RESUMEN MENSUAL — consolida 1ra + 2da quincena por empleado
+// ══════════════════════════════════════════════════════════
+let resumenMensualData = null;
+const MESES_RESUMEN = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+function initResumenMensual() {
+  const selAnio = document.getElementById('resAnio');
+  if (!selAnio.options.length) {
+    const y = new Date().getFullYear();
+    for (let a = y + 1; a >= y - 5; a--) selAnio.innerHTML += `<option value="${a}">${a}</option>`;
+    selAnio.value = y;
+    document.getElementById('resMes').value = new Date().getMonth() + 1;
+  }
+  cargarResumenMensual();
+}
+
+async function cargarResumenMensual() {
+  const mes = document.getElementById('resMes').value, anio = document.getElementById('resAnio').value;
+  const emp = document.getElementById('resEmpresa').value;
+  document.getElementById('tablaResumenMensual').innerHTML = '<p class="loading">Cargando...</p>';
+  const r = await api(`controllers/PlanillaController.php?action=resumen_mensual&mes=${mes}&anio=${anio}${emp ? '&empresa_id=' + emp : ''}`);
+  if (!r.ok) { document.getElementById('tablaResumenMensual').innerHTML = `<p style="color:var(--danger)">${r.data.error || 'Error al cargar el resumen.'}</p>`; return; }
+  resumenMensualData = { mes: +mes, anio: +anio, ...r.data.data };
+  renderResumenMensual();
+}
+
+function renderResumenMensual() {
+  const d = resumenMensualData, t = d.totales;
+  const q1 = d.planillas.filter(p => p.quincena === '1ra'), q2 = d.planillas.filter(p => p.quincena === '2da');
+  const badge = (txt, lista) => lista.length
+    ? `<span class="badge badge-green">${txt}: ${lista.map(p => (p.empresa_nombre ? p.empresa_nombre + ' · ' : '') + p.estado).join(', ')}</span>`
+    : `<span class="badge badge-red">${txt}: sin generar</span>`;
+  document.getElementById('resumenMensualInfo').innerHTML =
+    `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${badge('1ra quincena', q1)} ${badge('2da quincena', q2)}</div>` +
+    ((!q1.length || !q2.length) && d.planillas.length ? '<div style="font-size:12px;color:var(--warning,#f59e0b);margin-top:6px">⚠️ Falta generar una quincena: el resumen está incompleto.</div>' : '');
+  document.getElementById('kpiResSalarios').textContent    = fmtMoneda(t.salario_base);
+  document.getElementById('kpiResDeducciones').textContent = fmtMoneda(t.total_deducciones);
+  document.getElementById('kpiResNeto').textContent        = fmtMoneda(t.salario_neto);
+
+  if (!d.filas.length) { document.getElementById('tablaResumenMensual').innerHTML = '<p class="empty-state">No hay planillas generadas para este período.</p>'; return; }
+  const m = n => fmtMoneda(n), dash = n => (n === null || n === undefined) ? '—' : fmtMoneda(n);
+  const q = n => (+n || 0) ? +(+n).toFixed(2) : '—';
+  let h = `<table style="font-size:12px;min-width:1250px"><thead><tr>
+    <th>Empleado</th><th>Salario base</th><th>H. Extra<br><small>(cant.)</small></th><th>Monto H. Extra</th><th>Viáticos</th>
+    <th>Días fal.<br><small>(cant.)</small></th><th>Desc. faltas</th><th>Seguro</th><th>Abono préstamo</th><th>Abono vale</th>
+    <th>Total deducc.</th><th>Neto 1ra</th><th>Neto 2da</th><th>NETO DEL MES</th></tr></thead><tbody>`;
+  d.filas.forEach(f => {
+    h += `<tr>
+      <td><strong>${f.empleado}</strong><div style="font-size:10px;color:var(--muted)">${f.puesto || ''}</div></td>
+      <td>${m(f.salario_base)}</td><td style="text-align:center">${q(f.horas_extra)}</td><td>${m(f.monto_horas_extra)}</td><td>${m(f.viaticos)}</td>
+      <td style="text-align:center">${q(f.dias_faltados)}</td><td style="color:var(--danger)">${m(f.monto_dias_faltados)}</td>
+      <td style="color:var(--danger)">${m(f.seguro_privado)}</td><td style="color:var(--danger)">${m(f.abono_prestamo)}</td><td style="color:var(--danger)">${m(f.abono_vale)}</td>
+      <td style="color:var(--danger)">${m(f.total_deducciones)}</td><td>${dash(f.neto_1ra)}</td><td>${dash(f.neto_2da)}</td>
+      <td><strong style="color:var(--accent)">${m(f.salario_neto)}</strong></td></tr>`;
+  });
+  h += `<tr style="background:var(--bg);font-weight:700;border-top:2px solid var(--border)">
+      <td>TOTALES (${d.filas.length} empleados)</td><td>${m(t.salario_base)}</td><td style="text-align:center">${q(t.horas_extra)}</td><td>${m(t.monto_horas_extra)}</td><td>${m(t.viaticos)}</td>
+      <td style="text-align:center">${q(t.dias_faltados)}</td><td>${m(t.monto_dias_faltados)}</td><td>${m(t.seguro_privado)}</td><td>${m(t.abono_prestamo)}</td><td>${m(t.abono_vale)}</td>
+      <td>${m(t.total_deducciones)}</td><td>${m(t.neto_1ra)}</td><td>${m(t.neto_2da)}</td><td style="color:var(--accent)">${m(t.salario_neto)}</td></tr></tbody></table>`;
+  document.getElementById('tablaResumenMensual').innerHTML = h;
+}
+
+function _resumenEmpresaTxt() {
+  const sel = document.getElementById('resEmpresa');
+  return sel.value ? sel.options[sel.selectedIndex].text : 'SOLDYMEG / VAMER';
+}
+
+function exportarResumenMensualExcel() {
+  const d = resumenMensualData;
+  if (!d || !d.filas.length) { toast('No hay datos para exportar.', 'warn'); return; }
+  const t = d.totales, n = v => +(+v || 0);
+  const rows = [
+    ['RESUMEN MENSUAL DE PLANILLA'],
+    [`${MESES_RESUMEN[d.mes]} ${d.anio} — ${_resumenEmpresaTxt()}`],
+    [],
+    ['Empleado','Puesto','Salario base','H. Extra (cant.)','Monto H. Extra','Viáticos','Días faltados (cant.)','Desc. faltas','Seguro','Abono préstamo','Abono vale','Total deducciones','Neto 1ra quincena','Neto 2da quincena','NETO DEL MES'],
+    ...d.filas.map(f => [f.empleado, f.puesto || '', n(f.salario_base), n(f.horas_extra), n(f.monto_horas_extra), n(f.viaticos), n(f.dias_faltados), n(f.monto_dias_faltados),
+      n(f.seguro_privado), n(f.abono_prestamo), n(f.abono_vale), n(f.total_deducciones), f.neto_1ra === null ? '' : n(f.neto_1ra), f.neto_2da === null ? '' : n(f.neto_2da), n(f.salario_neto)]),
+    [],
+    ['TOTALES','', n(t.salario_base), n(t.horas_extra), n(t.monto_horas_extra), n(t.viaticos), n(t.dias_faltados), n(t.monto_dias_faltados),
+      n(t.seguro_privado), n(t.abono_prestamo), n(t.abono_vale), n(t.total_deducciones), n(t.neto_1ra), n(t.neto_2da), n(t.salario_neto)],
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [30,22,13,10,13,12,10,12,11,13,11,14,14,14,15].map(w => ({ wch: w }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Resumen Mensual');
+  XLSX.writeFile(wb, `Resumen_Planilla_${String(d.mes).padStart(2,'0')}_${d.anio}.xlsx`);
+}
+
+function exportarResumenMensualPDF() {
+  const d = resumenMensualData;
+  if (!d || !d.filas.length) { toast('No hay datos para exportar.', 'warn'); return; }
+  const t = d.totales, m = v => fmtMoneda(v), dash = v => (v === null || v === undefined) ? '—' : fmtMoneda(v);
+  const q = v => (+v || 0) ? +(+v).toFixed(2) : '—';
+  const filas = d.filas.map((f, i) => `<tr><td>${i + 1}</td><td>${f.empleado}</td>
+    <td class="n">${m(f.salario_base)}</td><td class="c">${q(f.horas_extra)}</td><td class="n">${m(f.monto_horas_extra)}</td><td class="n">${m(f.viaticos)}</td>
+    <td class="c">${q(f.dias_faltados)}</td><td class="n">${m(f.monto_dias_faltados)}</td><td class="n">${m(f.seguro_privado)}</td>
+    <td class="n">${m(f.abono_prestamo)}</td><td class="n">${m(f.abono_vale)}</td><td class="n">${m(f.total_deducciones)}</td>
+    <td class="n">${dash(f.neto_1ra)}</td><td class="n">${dash(f.neto_2da)}</td><td class="n b">${m(f.salario_neto)}</td></tr>`).join('');
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Resumen Planilla ${MESES_RESUMEN[d.mes]} ${d.anio}</title>
+  <style>
+    body{font-family:Arial,sans-serif;font-size:10px;padding:16px;color:#111}
+    h2{text-align:center;margin:0 0 2px} p.sub{text-align:center;color:#555;margin:2px 0 12px;font-size:11px}
+    table{width:100%;border-collapse:collapse} th,td{border:1px solid #bbb;padding:3px 4px;font-size:9px}
+    th{background:#eee;text-align:center} td.n{text-align:right} td.c{text-align:center} td.b{font-weight:700}
+    tfoot td{font-weight:700;background:#f4f4f4}
+    .firmas{display:flex;justify-content:space-around;margin-top:50px}.firmas div{width:28%;border-top:1px solid #111;text-align:center;padding-top:4px}
+    @media print{@page{size:landscape;margin:8mm}}
+  </style></head><body>
+  <h2>RESUMEN MENSUAL DE PLANILLA</h2>
+  <p class="sub">VENTAS AMERICA S. DE R.L — ${_resumenEmpresaTxt()} · ${MESES_RESUMEN[d.mes]} ${d.anio} (1ra + 2da quincena)</p>
+  <table><thead><tr><th>No.</th><th>Empleado</th><th>Salario base</th><th>H. Extra</th><th>Monto H. Extra</th><th>Viáticos</th><th>Días fal.</th><th>Desc. faltas</th>
+    <th>Seguro</th><th>Abono préstamo</th><th>Abono vale</th><th>Total deducc.</th><th>Neto 1ra</th><th>Neto 2da</th><th>NETO MES</th></tr></thead>
+  <tbody>${filas}</tbody>
+  <tfoot><tr><td colspan="2">TOTALES</td><td class="n">${m(t.salario_base)}</td><td class="c">${q(t.horas_extra)}</td><td class="n">${m(t.monto_horas_extra)}</td><td class="n">${m(t.viaticos)}</td>
+    <td class="c">${q(t.dias_faltados)}</td><td class="n">${m(t.monto_dias_faltados)}</td><td class="n">${m(t.seguro_privado)}</td><td class="n">${m(t.abono_prestamo)}</td><td class="n">${m(t.abono_vale)}</td>
+    <td class="n">${m(t.total_deducciones)}</td><td class="n">${m(t.neto_1ra)}</td><td class="n">${m(t.neto_2da)}</td><td class="n">${m(t.salario_neto)}</td></tr></tfoot></table>
+  <div class="firmas"><div>Elaboró</div><div>Revisó</div><div>Autorizó</div></div>
+  <script>window.onload=()=>window.print()<\/script></body></html>`;
+  const w = window.open('', '_blank');
+  if (!w) { toast('Permite las ventanas emergentes para ver el PDF.', 'warn'); return; }
+  w.document.write(html);
+  w.document.close();
 }
 
