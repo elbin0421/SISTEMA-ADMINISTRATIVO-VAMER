@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-//  VAMER — ReportesController  (Fase 5 — Rev.2)
+//  SOLDYMEG — ReportesController  (Fase 5 — Rev.2)
 // ============================================================
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/auth.php';
@@ -20,6 +20,7 @@ match(true) {
     $action === 'planilla_excel'                            => planillaExcel($sesion),
     $action === 'boucher_pdf'                                => boucherPDF($sesion),
     $action === 'boucher_todos_pdf'                          => boucherTodosPDF($sesion),
+    $action === 'movimientos'                               => reporteMovimientos($sesion, $format),
     $action === 'inventario' || $action === 'inventario_mov'=> reporteInventario($sesion, $format),
     $action === 'rentabilidad'||$action==='rentabilidad_ot' => reporteRentabilidad($sesion, $format),
     default => jsonResponder(400, ['error' => 'Accion no valida'])
@@ -55,6 +56,51 @@ function reporteRetenciones(array $sesion, string $format): void {
     $tot=['monto'=>array_sum(array_column($rows,'monto')),'retencion_isr'=>array_sum(array_column($rows,'retencion_isr')),'retencion_isv'=>array_sum(array_column($rows,'retencion_isv')),'monto_neto'=>array_sum(array_column($rows,'monto_neto'))];
     if($format==='excel') exportarExcel($rows,'retenciones',"Retenciones_{$anio}");
     else jsonResponder(200,['ok'=>true,'data'=>$rows,'totales'=>$tot]);
+}
+
+function reporteMovimientos(array $sesion, string $format): void {
+    requirePermiso($sesion['rol_id'], 'reportes_movimientos', 'puede_ver');
+    $mes = $_GET['mes'] ?? ''; $anio = (int)($_GET['anio'] ?? date('Y'));
+    $tipo = $_GET['tipo'] ?? 'todos'; $estado = $_GET['estado'] ?? 'todos';
+    $where = "WHERE YEAR(m.fecha)=?"; $params = [$anio];
+    if ($mes) { $where .= " AND MONTH(m.fecha)=?"; $params[] = (int)$mes; }
+    if (in_array($tipo, ['MAERSK', 'ALPLA'], true)) { $where .= " AND m.tipo=?"; $params[] = $tipo; }
+    if (in_array($estado, ['pendiente', 'facturado', 'anulado'], true)) { $where .= " AND m.estado=?"; $params[] = $estado; }
+    else { $where .= " AND m.estado<>'anulado'"; }
+    $stmt = getDB()->prepare("
+        SELECT m.id_movimiento, m.grupo_id, m.flete_num, m.fecha, m.tipo, m.periodo, m.ot, m.contenedor,
+               m.flete, m.destino, m.motorista, m.placa, m.tarifa, m.estado,
+               c.nombre AS cliente, f.numero_factura
+        FROM movimientos m
+        LEFT JOIN clientes c ON c.id_cliente = m.cliente_id
+        LEFT JOIN facturas f ON f.id_factura = m.factura_id
+        $where
+        ORDER BY m.fecha ASC, m.id_movimiento ASC
+    ");
+    $stmt->execute($params);
+
+    // Una fila por movimiento / flete, tal como está guardado. Los fletes registrados juntos comparten "grupo".
+    $rows = []; $tot = ['MAERSK' => 0.0, 'ALPLA' => 0.0, 'pendiente' => 0.0, 'facturado' => 0.0];
+    foreach ($stmt->fetchAll() as $m) {
+        $t = (float)$m['tarifa'];
+        $rows[] = [
+            'fecha' => $m['fecha'], 'tipo' => $m['tipo'], 'periodo' => $m['periodo'], 'cliente' => $m['cliente'],
+            'cliente_destino' => $m['destino'], 'ot' => $m['ot'], 'contenedor' => $m['contenedor'], 'flete' => $m['flete'],
+            'motorista' => $m['motorista'], 'placa' => $m['placa'],
+            'grupo' => $m['grupo_id'] ? 'G' . $m['grupo_id'] . ' · Flete ' . ($m['flete_num'] ?: '?') : '',
+            'tarifa' => number_format($t, 2, '.', ''), 'estado' => $m['estado'], 'factura' => $m['numero_factura'],
+        ];
+        if (isset($tot[$m['tipo']])) $tot[$m['tipo']] += $t;
+        if ($m['estado'] === 'pendiente') $tot['pendiente'] += $t;
+        if ($m['estado'] === 'facturado') $tot['facturado'] += $t;
+    }
+    $nombre = "Movimientos_" . ($tipo !== 'todos' ? $tipo . '_' : 'MAERSK_ALPLA_') . $anio . ($mes ? "-$mes" : '');
+    if ($format === 'excel') exportarExcel($rows, 'movimientos', $nombre);
+    else jsonResponder(200, ['ok' => true, 'data' => $rows, 'totales' => [
+        'movimientos' => (string)count($rows),
+        'total_tarifas' => round($tot['MAERSK'] + $tot['ALPLA'], 2), 'maersk' => round($tot['MAERSK'], 2), 'alpla' => round($tot['ALPLA'], 2),
+        'pendiente' => round($tot['pendiente'], 2), 'facturado' => round($tot['facturado'], 2),
+    ]]);
 }
 
 function reporteInventario(array $sesion, string $format): void {
@@ -101,7 +147,7 @@ function planillaPDF(array $sesion): void {
     $cols=$mostrarSeguro?12:11;
     echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>'.htmlspecialchars($titulo).'</title>';
     echo '<style>body{font-family:Arial,sans-serif;font-size:10px;margin:15px;color:#222}h2{text-align:center;font-size:13px;margin-bottom:3px}.sub{text-align:center;color:#555;font-size:10px;margin-bottom:12px}table{width:100%;border-collapse:collapse;margin-bottom:12px}th{background:#1a1a2e;color:#fff;padding:5px 3px;text-align:center;font-size:9px}td{border:1px solid #ddd;padding:4px 3px;text-align:right;font-size:9px}td.l{text-align:left}tr:nth-child(even){background:#f5f5f5}.tot{background:#e8f4e8;font-weight:bold}.boxes{text-align:center;margin-bottom:12px}.box{display:inline-block;border:1px solid #ccc;border-radius:5px;padding:6px 12px;margin:3px;text-align:center}.box strong{display:block;font-size:12px}@media print{body{margin:8px}}</style></head><body>';
-    echo '<h2>VAMER - '.htmlspecialchars($titulo).'</h2>';
+    echo '<h2>SOLDYMEG - '.htmlspecialchars($titulo).'</h2>';
     echo '<div class="sub">Fecha de pago: '.$p['fecha_pago'].' | Estado: '.strtoupper($p['estado']).'</div>';
     echo '<div class="boxes">'
         .'<div class="box">Empleados<strong>'.count($p['detalle']).'</strong></div>'
@@ -111,7 +157,7 @@ function planillaPDF(array $sesion): void {
         .'</div>';
     echo '<table><thead><tr><th>Empleado</th><th>Ubic.</th><th>Sal.Quincenal</th><th>H.Extra</th><th>Mto.HE</th><th style="color:#e8a020">Viáticos</th><th>D.Falt.</th><th>Desc.Falt.</th>';
     if($mostrarSeguro) echo '<th>Seguro</th>';
-    echo '<th>Abo.Prest.</th><th>Vale</th><th>Total Ded.</th><th>NETO</th></tr></thead><tbody>';
+    echo '<th>Abo.Prest.</th><th>Abo.Vale</th><th>Total Ded.</th><th>NETO</th></tr></thead><tbody>';
     $totalViaticosPlanilla = 0;
     foreach($p['detalle'] as $d){
         $viaticoFila = (float)($d['viatico_s1']??0)+(float)($d['viatico_s2']??0)+(float)($d['viatico_s3']??0)+(float)($d['viatico_s4']??0);
@@ -138,7 +184,7 @@ function planillaPDF(array $sesion): void {
     echo '<td colspan="2">—</td><td>'.$f($p['total_deducciones']).'</td><td>'.$f($p['total_neto']).'</td></tr>';
     echo '</tbody></table>';
     if(!empty($p['observaciones'])) echo '<p><strong>Observaciones:</strong> '.htmlspecialchars($p['observaciones']).'</p>';
-    echo '<p style="color:#888;font-size:9px;margin-top:20px">Generado: '.date('d/m/Y H:i').' | VAMER Sistema Administrativo</p>';
+    echo '<p style="color:#888;font-size:9px;margin-top:20px">Generado: '.date('d/m/Y H:i').' | SOLDYMEG Sistema Administrativo</p>';
     echo '<script>window.onload=()=>window.print();</script></body></html>';
     exit;
 }
@@ -305,7 +351,7 @@ function planillaExcel(array $sesion): void {
     header('Content-Disposition: attachment; filename="'.$filename.'"');
     echo "\xEF\xBB\xBF";
     $out=fopen('php://output','w');
-    fputcsv($out,["VAMER - Planilla {$quincena} Quincena - {$mes} {$p['periodo_anio']}"]);
+    fputcsv($out,["SOLDYMEG - Planilla {$quincena} Quincena - {$mes} {$p['periodo_anio']}"]);
     fputcsv($out,['Fecha pago: '.$p['fecha_pago'],'Estado: '.$p['estado']]);
     fputcsv($out,[]);
     $cab=['Empleado','Puesto','Ubicacion','Sal. Quincenal','Horas Extra','Monto HE','Viaticos','Dias Faltados','Desc. Faltados'];

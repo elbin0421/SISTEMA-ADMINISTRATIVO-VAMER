@@ -9,12 +9,19 @@ let reporteData   = [];
 
 function switchReporte(tipo) {
   reporteActual = tipo;
-  ['ventas','cxc','retenciones','rentabilidad','inventario'].forEach(t => {
-    document.getElementById('rptab' + t.charAt(0).toUpperCase()+t.slice(1))?.classList.toggle('active', t===tipo);
-  });
+  const nombres = { ventas:'📈 Ventas', cxc:'🕐 Cuentas x Cobrar', retenciones:'📋 Retenciones', rentabilidad:'💹 Rentabilidad OT', inventario:'📦 Inventario', movimientos:'🚛 Movimientos MAERSK / ALPLA' };
+  const t = document.getElementById('rpTitulo'); if (t) t.textContent = nombres[tipo] || tipo;
+  const tb = document.getElementById('topbarTitle'); if (tb) tb.textContent = 'Reporte: ' + (nombres[tipo] || tipo).replace(/^\S+\s/, '');
   document.getElementById('tablaReporte').innerHTML = '<p style="color:var(--muted);text-align:center;padding:40px">Haz clic en Consultar.</p>';
   document.getElementById('reporteKpis').style.display = 'none';
   document.getElementById('rpMes').style.display = tipo === 'cxc' ? 'none' : '';
+  ['rpMovTipo','rpMovEstado'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = tipo === 'movimientos' ? '' : 'none'; });
+}
+
+function _filtrosMovReporte() {
+  if (reporteActual !== 'movimientos') return '';
+  return '&tipo=' + encodeURIComponent(document.getElementById('rpMovTipo').value) +
+         '&estado=' + encodeURIComponent(document.getElementById('rpMovEstado').value);
 }
 
 async function ejecutarReporte() {
@@ -24,6 +31,7 @@ async function ejecutarReporte() {
   const anio = document.getElementById('rpAnio').value;
   let url = `controllers/ReportesController.php?action=${reporteActual}&anio=${anio}`;
   if (mes) url += '&mes=' + mes;
+  url += _filtrosMovReporte();
   const r = await api(url);
   if (!r.ok) {
     document.getElementById('tablaReporte').innerHTML = '<p style="color:var(--danger)">' + (r.data?.error || 'Error al cargar reporte.') + '</p>';
@@ -72,6 +80,7 @@ function exportarReporteExcel() {
   const anio = document.getElementById('rpAnio').value;
   let url = `controllers/ReportesController.php?action=${reporteActual}&format=excel&anio=${anio}`;
   if (mes) url += '&mes=' + mes;
+  url += _filtrosMovReporte();
   window.location.href = url;
 }
 

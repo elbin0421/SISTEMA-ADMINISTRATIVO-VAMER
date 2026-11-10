@@ -68,6 +68,23 @@ function badgeMovEstado(estado) {
   return `<span class="badge ${map[estado] || 'badge-gray'}">${estado}</span>`;
 }
 
+// Fletes registrados juntos (mismo contenedor) comparten grupo_id
+function _totalGrupoMov(m) {
+  if (!m.grupo_id) return 0;
+  return (movimientosDataFull || []).filter(x => String(x.grupo_id) === String(m.grupo_id)).length || 0;
+}
+function _badgeGrupoMov(m) {
+  if (!m.grupo_id) return '';
+  const tot = _totalGrupoMov(m);
+  return ` <span class="badge badge-yellow" title="Fletes registrados juntos (grupo G${m.grupo_id}). Click para filtrar." style="cursor:pointer;font-size:10px" onclick="filtrarGrupoMov(${m.grupo_id})">🔗 G${m.grupo_id} · Flete ${m.flete_num || '?'}${tot > 1 ? '/' + tot : ''}</span>`;
+}
+function filtrarGrupoMov(g) {
+  const rows = (movimientosDataFull || []).filter(x => String(x.grupo_id) === String(g));
+  paginaActual['movimientos'] = 1;
+  renderTablaMovimientos(rows);
+  toast(`Mostrando los fletes del grupo G${g}. Recarga el listado para ver todo.`, 'info');
+}
+
 function renderTablaMovimientos(rows) {
   const wrap = document.getElementById('tablaMovimientosWrap');
   paginaActual['movimientos'] = paginaActual['movimientos'] || 1;
@@ -95,7 +112,7 @@ function renderTablaMovimientos(rows) {
             <td><span class="badge badge-blue">${m.tipo}</span></td>
             <td>${m.cliente_nombre || '<span style="color:var(--muted)">—</span>'}${m.destino ? '<br><span class="td-sub">' + m.destino + '</span>' : ''}</td>
             <td>${m.periodo || '—'}</td>
-            <td>${m.contenedor || '—'}${m.flete ? '<br><span class="td-sub">Flete: ' + m.flete + '</span>' : ''}</td>
+            <td>${m.contenedor || '—'}${_badgeGrupoMov(m)}${m.flete ? '<br><span class="td-sub">Flete: ' + m.flete + '</span>' : ''}</td>
             <td>${m.motorista || '—'}${m.placa ? '<br><span class="td-sub">' + m.placa + '</span>' : ''}</td>
             <td>${fmtMoneda(m.tarifa)}</td>
             <td>${badgeMovEstado(m.estado)}</td>
@@ -143,6 +160,7 @@ async function verMovimiento(id) {
       ${fila('Placa', m.placa)}
       ${fila('Tarifa', fmtMoneda(m.tarifa))}
       ${fila('No. Factura', m.numero_factura)}
+      ${m.grupo_id ? fila('Grupo de fletes', 'G' + m.grupo_id + ' · Flete ' + (m.flete_num || '?')) : ''}
     </div>
     ${m.observacion ? `<div style="font-size:12px"><strong>Observación:</strong> ${m.observacion}</div>` : ''}`;
 
@@ -212,22 +230,35 @@ function exportarMovimientosListadoExcel() {
   const fechaHasta = document.getElementById('filtroMovFechaHasta')?.value || '';
   const periodo    = document.getElementById('filtroMovPeriodo')?.value    || '';
 
+  // Los fletes registrados juntos (mismo grupo) salen en UNA fila: tarifa sumada y flete / destino concatenados.
+  const uniq = arr => [...new Set(arr.map(v => String(v ?? '').trim()).filter(Boolean))];
+  const grupos = [], porGrupo = {};
+  movimientosDataFull.forEach(m => {
+    if (!m.grupo_id) { grupos.push([m]); return; }
+    if (!porGrupo[m.grupo_id]) { porGrupo[m.grupo_id] = []; grupos.push(porGrupo[m.grupo_id]); }
+    porGrupo[m.grupo_id].push(m);
+  });
+  grupos.forEach(g => g.sort((x, y) => (+x.flete_num || 0) - (+y.flete_num || 0) || x.id_movimiento - y.id_movimiento));
+  const SEP = ' / ';
   const rows = [
-    ['Fecha', 'Hora', 'Tipo', 'Periodo', 'Cliente', 'Destino', 'OT', 'Contenedor', 'Flete', 'Motorista', 'Placa', 'Tarifa', 'Estado', 'No. Factura'],
-    ...movimientosDataFull.map(m => [
-      m.fecha, m.hora ? m.hora.slice(0,5) : '', m.tipo, m.periodo || '',
-      m.cliente_nombre || '', m.destino || '', m.ot || '', m.contenedor || '',
-      m.flete || '', m.motorista || '', m.placa || '',
-      parseFloat(m.tarifa || 0), m.estado, m.numero_factura || '',
-    ]),
+    ['Fecha', 'Hora', 'Tipo', 'Periodo', 'Cliente', 'Cliente / Destino', 'OT', 'Contenedor', 'Flete', 'Motorista', 'Placa', 'Fletes', 'Tarifa', 'Estado', 'No. Factura'],
+    ...grupos.map(g => {
+      const m = g[0];
+      return [
+        m.fecha, m.hora ? m.hora.slice(0,5) : '', m.tipo, m.periodo || '',
+        m.cliente_nombre || '', uniq(g.map(x => x.destino)).join(SEP), m.ot || '', m.contenedor || '',
+        uniq(g.map(x => x.flete)).join(SEP), uniq(g.map(x => x.motorista)).join(SEP), uniq(g.map(x => x.placa)).join(SEP),
+        g.length, g.reduce((s, x) => s + parseFloat(x.tarifa || 0), 0), uniq(g.map(x => x.estado)).join(SEP), uniq(g.map(x => x.numero_factura)).join(SEP),
+      ];
+    }),
   ];
 
   const totalTarifa = movimientosDataFull.reduce((s, m) => s + parseFloat(m.tarifa || 0), 0);
   rows.push([]);
-  rows.push(['', '', '', '', '', '', '', '', '', '', 'TOTAL', totalTarifa]);
+  rows.push(['', '', '', '', '', '', '', '', '', '', '', 'TOTAL', totalTarifa]);
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols'] = [11,7,9,16,26,16,12,14,10,16,10,10,11,14].map(w => ({ wch: w }));
+  ws['!cols'] = [11,7,9,16,26,40,12,14,40,24,16,7,12,11,14].map(w => ({ wch: w }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Movimientos');
 
@@ -270,6 +301,76 @@ async function exportarMovimientoExcel(id) {
 }
 
 // ── CREAR / EDITAR ───────────────────────────────────────────
+// ── Fletes adicionales (solo al registrar) ───────────────
+let _movFleteSeq = 0;
+function _optsMotoristasMov() {
+  const sel = document.getElementById('movMotorista');
+  return sel ? sel.innerHTML : '<option value="">— Seleccionar motorista —</option>';
+}
+function agregarFleteMov() {
+  const id = ++_movFleteSeq, hoy = document.getElementById('movFecha').value || new Date().toISOString().slice(0, 10);
+  const div = document.createElement('div');
+  div.className = 'mov-flete-extra'; div.dataset.n = id;
+  div.style.cssText = 'border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px;background:rgba(62,207,142,.05)';
+  div.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <strong class="mov-flete-titulo" style="color:var(--success,#3ecf8e)"></strong>
+      <button type="button" class="btn btn-sm btn-danger" onclick="quitarFleteMov(${id})">Quitar</button>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="mov-lbl-fecha">Fecha *</label><input type="date" class="mx-fecha" value="${hoy}"></div>
+      <div class="form-group"><label class="mov-lbl-placa">Placa</label><input type="text" class="mx-placa"></div>
+    </div>
+    <div class="form-group"><label class="mov-lbl-flete">Flete</label><input type="text" class="mx-flete" placeholder="Ej: San Pedro Sula - Puerto Cortés"></div>
+    <div class="form-group"><label class="mov-lbl-destino">Cliente / Destino</label><input type="text" class="mx-destino" placeholder="Ej: Bodega ALPLA, Choloma"></div>
+    <div class="form-row">
+      <div class="form-group"><label class="mov-lbl-mot">Motorista</label>
+        <select class="mx-mot" style="width:100%;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px">${_optsMotoristasMov()}</select></div>
+      <div class="form-group"><label class="mov-lbl-tarifa">Tarifa (L.) *</label><input type="number" class="mx-tarifa" min="0" step="0.01" placeholder="0.00" oninput="actualizarTotalFletesMov()"></div>
+    </div>`;
+  const sel = div.querySelector('.mx-mot'); sel.value = '';
+  document.getElementById('movFletesExtra').appendChild(div);
+  _renumerarFletesMov();
+}
+function quitarFleteMov(id) {
+  const el = document.querySelector(`.mov-flete-extra[data-n="${id}"]`); if (el) el.remove();
+  _renumerarFletesMov();
+}
+function _renumerarFletesMov() {
+  document.querySelectorAll('#movFletesExtra .mov-flete-extra').forEach((el, i) => {
+    const n = i + 2;
+    el.querySelector('.mov-flete-titulo').textContent = 'Flete ' + n;
+    el.querySelector('.mov-lbl-fecha').textContent   = `Fecha ${n} *`;
+    el.querySelector('.mov-lbl-placa').textContent   = `Placa ${n}`;
+    el.querySelector('.mov-lbl-flete').textContent   = `Flete ${n}`;
+    el.querySelector('.mov-lbl-destino').textContent = `Cliente / Destino ${n}`;
+    el.querySelector('.mov-lbl-mot').textContent     = `Motorista ${n}`;
+    el.querySelector('.mov-lbl-tarifa').textContent  = `Tarifa ${n} (L.) *`;
+  });
+  actualizarTotalFletesMov();
+}
+function actualizarTotalFletesMov() {
+  const extras = document.querySelectorAll('#movFletesExtra .mov-flete-extra');
+  const box = document.getElementById('movTotalFletes');
+  if (!extras.length) { box.style.display = 'none'; return; }
+  let total = parseFloat(document.getElementById('movTarifa').value) || 0;
+  extras.forEach(el => { total += parseFloat(el.querySelector('.mx-tarifa').value) || 0; });
+  document.getElementById('movTotalFletesLbl').textContent = `Total tarifas (${extras.length + 1} fletes)`;
+  document.getElementById('movTotalFletesVal').textContent = fmtMoneda(total);
+  box.style.display = 'flex';
+}
+function _leerFletesExtraMov() {
+  return [...document.querySelectorAll('#movFletesExtra .mov-flete-extra')].map(el => {
+    const mot = el.querySelector('.mx-mot');
+    return {
+      fecha: el.querySelector('.mx-fecha').value, placa: el.querySelector('.mx-placa').value.trim(),
+      flete: el.querySelector('.mx-flete').value.trim(), destino: el.querySelector('.mx-destino').value.trim(),
+      motorista_id: mot.value || null, motorista: mot.value ? mot.selectedOptions[0].textContent.replace(/\s*\(.*\)$/, '') : '',
+      tarifa: parseFloat(el.querySelector('.mx-tarifa').value || 0),
+    };
+  });
+}
+
 async function cargarMotoristasMovimiento() {
   const sel = document.getElementById('movMotorista');
   if (!sel) return;
@@ -297,6 +398,9 @@ async function abrirModalMovimiento(id = null) {
    'movChasis','movPlaca','movTarifa','movObservacion'
   ].forEach(f => { const el = document.getElementById(f); if (el) el.value = ''; });
   await cargarMotoristasMovimiento();
+  document.getElementById('movFletesExtra').innerHTML = '';
+  document.getElementById('movFletesWrap').style.display = id ? 'none' : '';
+  actualizarTotalFletesMov();
 
   document.getElementById('tituloModalMovimiento').textContent = id ? '🚛 Editar Movimiento' : '🚛 Registrar Movimiento';
   document.getElementById('btnGuardarMovimiento').textContent  = id ? 'Guardar Cambios' : 'Registrar Movimiento';
@@ -394,6 +498,15 @@ async function guardarMovimiento() {
   if (!body.fecha) { errEl.textContent = 'La fecha es requerida.'; errEl.style.display = 'block'; return; }
   if (isNaN(body.tarifa) || body.tarifa < 0) { errEl.textContent = 'La tarifa no es válida.'; errEl.style.display = 'block'; return; }
 
+  if (!id) {
+    const extras = _leerFletesExtraMov();
+    for (let i = 0; i < extras.length; i++) {
+      if (!extras[i].fecha) { errEl.textContent = `Flete ${i + 2}: la fecha es requerida.`; errEl.style.display = 'block'; return; }
+      if (isNaN(extras[i].tarifa) || extras[i].tarifa < 0) { errEl.textContent = `Flete ${i + 2}: la tarifa no es válida.`; errEl.style.display = 'block'; return; }
+    }
+    if (extras.length) body.fletes_extra = extras;
+  }
+
   const btn = document.getElementById('btnGuardarMovimiento');
   btn.disabled = true;
   try {
@@ -406,7 +519,7 @@ async function guardarMovimiento() {
     }
     if (r.ok) {
       cerrarModal('modalMovimiento');
-      toast(id ? 'Movimiento actualizado.' : 'Movimiento registrado.', 'success');
+      toast(id ? 'Movimiento actualizado.' : ((r.data.ids || []).length > 1 ? `${r.data.ids.length} movimientos registrados.` : 'Movimiento registrado.'), 'success');
       cargarMovimientos();
     } else {
       errEl.textContent = r.data.error || 'Error al guardar.'; errEl.style.display = 'block';

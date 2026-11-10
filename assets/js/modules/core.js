@@ -124,7 +124,7 @@ document.querySelectorAll('.nav-item[data-module]').forEach(el => {
       asistencia: () => { if (typeof cargarAsistencia === 'function') cargarAsistencia(); },
       marcaciones: () => { if (typeof cargarMarcaciones === 'function') cargarMarcaciones(); },
       gastos: () => { initFiltrosGastos(); cargarGastos(); },
-      reportes:  () => {},
+      reportes:  () => { if (typeof switchReporte === 'function') switchReporte(this.dataset.reporte || reporteActual); },
       cai:       () => cargarModuloCAI(),
     };
     if (loaders[mod]) loaders[mod]();

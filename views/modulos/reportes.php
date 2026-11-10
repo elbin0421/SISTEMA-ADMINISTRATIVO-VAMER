@@ -11,6 +11,7 @@
       'retenciones'  => ['id' => 'rptabRetenciones',   'icono' => '📋', 'label' => 'Retenciones'],
       'rentabilidad' => ['id' => 'rptabRentabilidad',  'icono' => '💹', 'label' => 'Rentabilidad OT'],
       'inventario'   => ['id' => 'rptabInventario',    'icono' => '📦', 'label' => 'Inventario'],
+      'movimientos'  => ['id' => 'rptabMovimientos',   'icono' => '🚛', 'label' => 'Movimientos MAERSK / ALPLA'],
     ];
     $reportesVisibles = [];
     foreach ($subReportes as $key => $info) {
@@ -20,12 +21,8 @@
     ?>
 
     <?php if ($primerReporte): ?>
-    <!-- Selector de reporte -->
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px">
-      <?php foreach ($reportesVisibles as $key => $info): ?>
-        <button class="tab-btn<?= $key === $primerReporte ? ' active' : '' ?>" id="<?= $info['id'] ?>" onclick="switchReporte('<?= $key ?>')"><?= $info['icono'] ?> <?= htmlspecialchars($info['label']) ?></button>
-      <?php endforeach; ?>
-    </div>
+    <!-- El reporte se elige desde el menú lateral (Análisis) -->
+    <h5 id="rpTitulo" style="margin:0 0 14px;font-size:15px"></h5>
     <script>window.__reporteInicial = <?= json_encode($primerReporte) ?>;</script>
 
     <!-- Filtros comunes -->
@@ -41,6 +38,12 @@
       </select>
       <select id="rpAnio" style="padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px">
         <option value="2025">2025</option><option value="2026" selected>2026</option><option value="2027">2027</option>
+      </select>
+      <select id="rpMovTipo" style="display:none;padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px">
+        <option value="todos">Tipo: Todos</option><option value="MAERSK">MAERSK</option><option value="ALPLA">ALPLA</option>
+      </select>
+      <select id="rpMovEstado" style="display:none;padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px">
+        <option value="todos">Estado: Todos (sin anulados)</option><option value="pendiente">Pendientes</option><option value="facturado">Facturados</option><option value="anulado">Anulados</option>
       </select>
       <button class="btn btn-primary" onclick="ejecutarReporte()">🔍 Consultar</button>
       <button class="btn btn-secondary" onclick="exportarReporteExcel()">⬇️ Excel</button>

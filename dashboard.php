@@ -169,7 +169,15 @@ function puedeVerModulo(string $dataModule) {
         <svg class="nav-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
       <div class="nav-group-body">
-        <a class="nav-item" data-module="reportes" title="Reportes"><span class="nav-icon">📈</span><span class="nav-text">Reportes</span></a>
+        <?php
+        $menuReportes = [
+          'ventas' => ['📈', 'Ventas'], 'cxc' => ['🕐', 'Cuentas x Cobrar'], 'retenciones' => ['📋', 'Retenciones'],
+          'rentabilidad' => ['💹', 'Rentabilidad OT'], 'inventario' => ['📦', 'Inventario'], 'movimientos' => ['🚛', 'Movimientos MAERSK / ALPLA'],
+        ];
+        foreach ($menuReportes as $rk => [$ri, $rl]):
+          if (!tienePermiso($sesion['rol_id'], "reportes_$rk", 'puede_ver')) continue; ?>
+        <a class="nav-item" data-module="reportes" data-reporte="<?= $rk ?>" title="Reporte: <?= htmlspecialchars($rl) ?>"><span class="nav-icon"><?= $ri ?></span><span class="nav-text"><?= htmlspecialchars($rl) ?></span></a>
+        <?php endforeach; ?>
       </div>
     </div>
     <?php endif; ?>

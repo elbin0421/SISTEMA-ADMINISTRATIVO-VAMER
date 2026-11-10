@@ -69,8 +69,17 @@ function crear(array $sesion): void {
     $d = json_decode(file_get_contents('php://input'), true) ?? [];
     $err = validar($d);
     if ($err) { responder(400, ['error' => $err]); return; }
-    $id = MovimientoModel::crear($d, $sesion['usuario_id']);
-    responder(201, ['ok' => true, 'id' => $id]);
+    $extras = is_array($d['fletes_extra'] ?? null) ? $d['fletes_extra'] : [];
+    if (count($extras) > 10) { responder(400, ['error' => 'Máximo 10 fletes adicionales.']); return; }
+    foreach ($extras as $i => $x) {
+        $n = $i + 2;
+        if (empty($x['fecha'])) { responder(400, ['error' => "Flete $n: la fecha es requerida."]); return; }
+        if (!is_numeric($x['tarifa'] ?? null) || (float)$x['tarifa'] < 0) { responder(400, ['error' => "Flete $n: la tarifa no es válida."]); return; }
+    }
+    try {
+        $ids = MovimientoModel::crearConFletes($d, $extras, $sesion['usuario_id']);
+    } catch (Exception $e) { responder(400, ['error' => $e->getMessage()]); return; }
+    responder(201, ['ok' => true, 'id' => $ids[0], 'ids' => $ids]);
 }
 
 function editar(array $sesion): void {

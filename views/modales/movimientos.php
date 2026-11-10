@@ -85,8 +85,19 @@
       </div>
       <div class="form-group">
         <label>Tarifa (L.) *</label>
-        <input type="number" id="movTarifa" min="0" step="0.01" placeholder="0.00">
+        <input type="number" id="movTarifa" min="0" step="0.01" placeholder="0.00" oninput="actualizarTotalFletesMov()">
       </div>
+    </div>
+
+    <!-- Fletes adicionales (mismo contenedor): cada uno se guarda como una fila nueva -->
+    <div id="movFletesExtra"></div>
+    <div id="movFletesWrap" style="margin-bottom:12px">
+      <button type="button" id="btnAgregarFlete" onclick="agregarFleteMov()"
+        style="width:100%;padding:12px;background:transparent;border:1px dashed var(--border);border-radius:8px;color:var(--success,#3ecf8e);font-weight:600;font-size:13px;cursor:pointer">+ Agregar flete</button>
+      <div id="movTotalFletes" style="display:none;justify-content:space-between;align-items:center;margin-top:10px;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:13px">
+        <span id="movTotalFletesLbl" style="color:var(--muted)"></span><strong id="movTotalFletesVal" style="color:var(--success,#3ecf8e);font-size:16px"></strong>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">Mismo contenedor: cada flete se registra como una fila nueva con el tipo, periodo, cliente, OT, contenedor y chasis del flete 1.</div>
     </div>
 
     <div class="form-group">

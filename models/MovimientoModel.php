@@ -92,6 +92,37 @@ class MovimientoModel {
         return (int)$pdo->lastInsertId();
     }
 
+    /**
+     * Crea el movimiento principal (flete 1) y una fila nueva por cada flete adicional.
+     * Los adicionales heredan tipo, periodo, cliente, OT, contenedor y chasis del flete 1.
+     */
+    public static function crearConFletes(array $d, array $extras, int $usuario_id): array {
+        $pdo = getDB();
+        $pdo->beginTransaction();
+        try {
+            $ids = [self::crear($d, $usuario_id)];
+            foreach ($extras as $x) {
+                $fila = array_merge($d, [
+                    'fecha'        => $x['fecha'],
+                    'hora'         => null,
+                    'flete'        => trim((string)($x['flete'] ?? '')),
+                    'destino'      => trim((string)($x['destino'] ?? '')),
+                    'placa'        => trim((string)($x['placa'] ?? '')),
+                    'motorista_id' => $x['motorista_id'] ?? null,
+                    'motorista'    => trim((string)($x['motorista'] ?? '')),
+                    'tarifa'       => (float)$x['tarifa'],
+                ]);
+                $ids[] = self::crear($fila, $usuario_id);
+            }
+            if ($extras) {
+                $up = $pdo->prepare("UPDATE movimientos SET grupo_id = ?, flete_num = ? WHERE id_movimiento = ?");
+                foreach ($ids as $i => $id) $up->execute([$ids[0], $i + 1, $id]);
+            }
+            $pdo->commit();
+            return $ids;
+        } catch (Exception $e) { if ($pdo->inTransaction()) $pdo->rollBack(); throw $e; }
+    }
+
     public static function editar(int $id, array $d): void {
         $actual = self::obtener($id);
         if (!$actual) throw new Exception('Movimiento no encontrado.');
