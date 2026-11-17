@@ -6,6 +6,15 @@
     <input type="hidden" id="empId">
 
     <div class="section-title">👤 Datos personales</div>
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
+      <div id="empFotoPreview"></div>
+      <div>
+        <input type="file" id="empFotoInput" accept="image/*" style="display:none" onchange="empElegirFoto(this)">
+        <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('empFotoInput').click()">📷 Subir foto</button>
+        <button type="button" class="btn btn-sm btn-danger" id="empFotoQuitarBtn" onclick="empQuitarFoto()" style="display:none">Quitar</button>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">JPG o PNG. Se reduce automáticamente.</div>
+      </div>
+    </div>
     <div class="form-row">
       <div class="form-group"><label>Nombres *</label><input type="text" id="empNombres" placeholder="Ej: Melvin Danilson"></div>
       <div class="form-group"><label>Apellidos *</label><input type="text" id="empApellidos" placeholder="Ej: Gomez Aguilar"></div>

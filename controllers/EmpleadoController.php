@@ -20,6 +20,8 @@ match(true) {
     $action === 'crear'         && $method === 'POST' => crear($sesion),
     $action === 'actualizar'    && $method === 'POST' => actualizar($sesion),
     $action === 'cambiar_estado'&& $method === 'POST' => cambiarEstado($sesion),
+    $action === 'foto'          && $method === 'POST' => subirFoto($sesion),
+    $action === 'foto_quitar'   && $method === 'POST' => quitarFoto($sesion),
     default => responder(400, ['error' => 'Acción no válida'])
 };
 
@@ -61,6 +63,40 @@ function cambiarEstado(array $sesion): void {
     $estado = trim($d['estado'] ?? '');
     if (!$id || !$estado) { responder(400, ['error' => 'id y estado requeridos']); return; }
     EmpleadoModel::cambiarEstado($id, $estado);
+    responder(200, ['ok' => true]);
+}
+function fotoDir(): string { return __DIR__ . '/../uploads/empleados/'; }
+
+function borrarFotoActual(int $id): void {
+    $st = getDB()->prepare("SELECT foto FROM empleados WHERE id_empleado = ?"); $st->execute([$id]);
+    $f = $st->fetchColumn();
+    if ($f && preg_match('#^uploads/empleados/emp_\d+_\d+\.(jpg|png|webp)$#', $f) && is_file(__DIR__ . '/../' . $f)) @unlink(__DIR__ . '/../' . $f);
+}
+function subirFoto(array $sesion): void {
+    requirePermiso($sesion['rol_id'], 'planillas', 'puede_editar');
+    $d  = json_decode(file_get_contents('php://input'), true) ?? [];
+    $id = (int)($d['id'] ?? 0);
+    if (!$id || !EmpleadoModel::obtener($id)) { responder(400, ['error' => 'Empleado no encontrado']); return; }
+    if (!preg_match('#^data:image/(jpeg|png|webp);base64,(.+)$#s', (string)($d['imagen'] ?? ''), $m)) { responder(400, ['error' => 'Imagen no válida']); return; }
+    $bin = base64_decode($m[2], true);
+    if ($bin === false || strlen($bin) > 3 * 1024 * 1024) { responder(400, ['error' => 'La imagen es inválida o supera 3 MB']); return; }
+    $info = @getimagesizeFromString($bin);
+    $ext = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'][$info['mime'] ?? ''] ?? null;
+    if (!$ext) { responder(400, ['error' => 'El archivo no es una imagen válida']); return; }
+    if (!is_dir(fotoDir()) && !@mkdir(fotoDir(), 0755, true)) { responder(500, ['error' => 'No se pudo crear la carpeta uploads/empleados']); return; }
+    $nombre = "emp_{$id}_" . time() . ".$ext";
+    if (@file_put_contents(fotoDir() . $nombre, $bin) === false) { responder(500, ['error' => 'No se pudo guardar la foto (revisa permisos de uploads/empleados)']); return; }
+    borrarFotoActual($id);
+    getDB()->prepare("UPDATE empleados SET foto = ? WHERE id_empleado = ?")->execute(["uploads/empleados/$nombre", $id]);
+    responder(200, ['ok' => true, 'foto' => "uploads/empleados/$nombre"]);
+}
+function quitarFoto(array $sesion): void {
+    requirePermiso($sesion['rol_id'], 'planillas', 'puede_editar');
+    $d  = json_decode(file_get_contents('php://input'), true) ?? [];
+    $id = (int)($d['id'] ?? 0);
+    if (!$id) { responder(400, ['error' => 'id requerido']); return; }
+    borrarFotoActual($id);
+    getDB()->prepare("UPDATE empleados SET foto = NULL WHERE id_empleado = ?")->execute([$id]);
     responder(200, ['ok' => true]);
 }
 function responder(int $code, array $data): void {

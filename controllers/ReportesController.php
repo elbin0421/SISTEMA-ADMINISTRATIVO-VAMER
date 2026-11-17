@@ -21,6 +21,7 @@ match(true) {
     $action === 'boucher_pdf'                                => boucherPDF($sesion),
     $action === 'boucher_todos_pdf'                          => boucherTodosPDF($sesion),
     $action === 'movimientos'                               => reporteMovimientos($sesion, $format),
+    $action === 'pagos'                                     => reportePagos($sesion, $format),
     $action === 'inventario' || $action === 'inventario_mov'=> reporteInventario($sesion, $format),
     $action === 'rentabilidad'||$action==='rentabilidad_ot' => reporteRentabilidad($sesion, $format),
     default => jsonResponder(400, ['error' => 'Accion no valida'])
@@ -56,6 +57,45 @@ function reporteRetenciones(array $sesion, string $format): void {
     $tot=['monto'=>array_sum(array_column($rows,'monto')),'retencion_isr'=>array_sum(array_column($rows,'retencion_isr')),'retencion_isv'=>array_sum(array_column($rows,'retencion_isv')),'monto_neto'=>array_sum(array_column($rows,'monto_neto'))];
     if($format==='excel') exportarExcel($rows,'retenciones',"Retenciones_{$anio}");
     else jsonResponder(200,['ok'=>true,'data'=>$rows,'totales'=>$tot]);
+}
+
+function reportePagos(array $sesion, string $format): void {
+    requirePermiso($sesion['rol_id'], 'reportes_pagos', 'puede_ver');
+    $mes = $_GET['mes'] ?? ''; $anio = (int)($_GET['anio'] ?? date('Y'));
+    $where = "WHERE f.estado <> 'anulada' AND p.estado <> 'anulado' AND YEAR(f.fecha) = ?"; $params = [$anio];
+    if ($mes) { $where .= " AND MONTH(f.fecha) = ?"; $params[] = (int)$mes; }
+    $stmt = getDB()->prepare("
+        SELECT f.id_factura, f.fecha AS fecha_factura, f.numero_factura, c.nombre AS nombre_cliente, f.total,
+               p.fecha AS fecha_pago, p.retencion_isr, p.retencion_isv, p.monto_neto,
+               (f.total - COALESCE(p.retencion_isr,0) - COALESCE(p.retencion_isv,0) - COALESCE(p.monto_neto,0)) AS diferencia,
+               p.referencia, p.estado
+        FROM facturas f
+        LEFT JOIN clientes c ON f.cliente_id = c.id_cliente
+        LEFT JOIN pagos_clientes p ON p.factura_id = f.id_factura
+        $where
+        ORDER BY f.fecha, f.numero_factura, p.fecha
+    ");
+    $stmt->execute($params);
+    $meses = [1=>'Enero',2=>'Febrero',3=>'Marzo',4=>'Abril',5=>'Mayo',6=>'Junio',7=>'Julio',8=>'Agosto',9=>'Septiembre',10=>'Octubre',11=>'Noviembre',12=>'Diciembre'];
+    $rows = []; $facturas = []; $t = ['facturado' => 0.0, 'r1' => 0.0, 'r125' => 0.0, 'neto' => 0.0, 'dif' => 0.0];
+    foreach ($stmt->fetchAll() as $r) {
+        $rows[] = [
+            'fecha_factura' => $r['fecha_factura'], 'Mes' => $meses[(int)date('n', strtotime($r['fecha_factura']))],
+            'numero_factura' => $r['numero_factura'], 'nombre_cliente' => $r['nombre_cliente'], 'total' => number_format((float)$r['total'], 2, '.', ''),
+            'fecha_pago' => $r['fecha_pago'], 'retencion 1%' => number_format((float)$r['retencion_isr'], 2, '.', ''),
+            'retencion 12.5%' => number_format((float)$r['retencion_isv'], 2, '.', ''), 'monto_neto' => number_format((float)$r['monto_neto'], 2, '.', ''),
+            'diferencia' => number_format((float)$r['diferencia'], 2, '.', ''), 'referencia' => $r['referencia'], 'estado' => $r['estado'],
+        ];
+        if (!isset($facturas[$r['id_factura']])) { $facturas[$r['id_factura']] = 1; $t['facturado'] += (float)$r['total']; }
+        $t['r1'] += (float)$r['retencion_isr']; $t['r125'] += (float)$r['retencion_isv'];
+        $t['neto'] += (float)$r['monto_neto']; $t['dif'] += (float)$r['diferencia'];
+    }
+    $nombre = "Integracion_Pagos_" . $anio . ($mes ? "-$mes" : '');
+    if ($format === 'excel') exportarExcel($rows, 'pagos', $nombre);
+    else jsonResponder(200, ['ok' => true, 'data' => $rows, 'totales' => [
+        'facturas' => (string)count($facturas), 'pagos' => (string)count($rows), 'total_facturado' => round($t['facturado'], 2),
+        'retencion_1' => round($t['r1'], 2), 'retencion_12_5' => round($t['r125'], 2), 'monto_neto' => round($t['neto'], 2), 'diferencia' => round($t['dif'], 2),
+    ]]);
 }
 
 function reporteMovimientos(array $sesion, string $format): void {

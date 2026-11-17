@@ -118,7 +118,13 @@ document.querySelectorAll('.nav-item[data-module]').forEach(el => {
       movimientos: () => { if (typeof cargarMovimientos === 'function') cargarMovimientos(); },
       libro_ventas: () => {},
       pagos:     () => { if (typeof cargarModuloPagos    === 'function') cargarModuloPagos(); },
-      planillas: () => { if (typeof cargarModuloPlanillas=== 'function') cargarModuloPlanillas(); },
+      planillas: () => {
+        const tab = this.dataset.tab || 'empleados';
+        const nombres = { empleados:'Empleados', planillas:'Planillas', resumen:'Resumen Mensual de Planilla', especiales:'14vo y Aguinaldo' };
+        document.getElementById('topbarTitle').textContent = nombres[tab] || 'Planilla';
+        if (typeof cargarModuloPlanillas === 'function') cargarModuloPlanillas();
+        if (typeof switchTabPlanilla === 'function') switchTabPlanilla(tab);
+      },
       vacaciones: () => { if (typeof cargarVacaciones=== 'function') cargarVacaciones(); },
       recibos:   () => { if (typeof cargarRecibos === 'function') cargarRecibos(); },
       asistencia: () => { if (typeof cargarAsistencia === 'function') cargarAsistencia(); },

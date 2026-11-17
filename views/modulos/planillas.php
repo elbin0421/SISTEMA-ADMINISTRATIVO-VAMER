@@ -1,12 +1,6 @@
 <div class="module" id="mod-planillas">
 
-  <!-- Tabs principales -->
-  <div style="display:flex;gap:4px;margin-bottom:16px;border-bottom:2px solid var(--border)">
-    <button id="tabEmpleados"  class="tab-btn active" onclick="switchTabPlanilla('empleados')">👷 Empleados</button>
-    <button id="tabPlanillas"  class="tab-btn"        onclick="switchTabPlanilla('planillas')">📋 Planillas</button>
-    <button id="tabResumen"    class="tab-btn"        onclick="switchTabPlanilla('resumen')">📊 Resumen Mensual</button>
-    <button id="tabEspeciales" class="tab-btn"        onclick="switchTabPlanilla('especiales')">1️⃣4️⃣&nbsp;/&nbsp;🎄 14vo &amp; Aguinaldo</button>
-  </div>
+  <!-- Las secciones (Empleados, Planillas, Resumen Mensual, 14vo y Aguinaldo) se eligen desde el menú lateral (RRHH) -->
 
   <!-- ── Panel Empleados ── -->
   <div id="panelEmpleados">

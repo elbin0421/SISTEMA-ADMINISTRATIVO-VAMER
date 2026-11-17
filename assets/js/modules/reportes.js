@@ -9,7 +9,7 @@ let reporteData   = [];
 
 function switchReporte(tipo) {
   reporteActual = tipo;
-  const nombres = { ventas:'📈 Ventas', cxc:'🕐 Cuentas x Cobrar', retenciones:'📋 Retenciones', rentabilidad:'💹 Rentabilidad OT', inventario:'📦 Inventario', movimientos:'🚛 Movimientos MAERSK / ALPLA' };
+  const nombres = { ventas:'📈 Ventas', cxc:'🕐 Cuentas x Cobrar', retenciones:'📋 Retenciones', rentabilidad:'💹 Rentabilidad OT', inventario:'📦 Inventario', movimientos:'🚛 Movimientos MAERSK / ALPLA', pagos:'💵 Integración de Pagos' };
   const t = document.getElementById('rpTitulo'); if (t) t.textContent = nombres[tipo] || tipo;
   const tb = document.getElementById('topbarTitle'); if (tb) tb.textContent = 'Reporte: ' + (nombres[tipo] || tipo).replace(/^\S+\s/, '');
   document.getElementById('tablaReporte').innerHTML = '<p style="color:var(--muted);text-align:center;padding:40px">Haz clic en Consultar.</p>';
@@ -60,7 +60,7 @@ function renderReporte(data) {
   } else { kpisEl.style.display = 'none'; }
   const pag  = paginar('reporte', rows);
   const cols = Object.keys(rows[0]);
-  let h = '<table><thead><tr>' + cols.map(c => `<th>${c.replace(/_/g,' ')}</th>`).join('') + '</tr></thead><tbody>';
+  let h = '<table><thead><tr>' + cols.map(c => `<th>${rpTitulo(c)}</th>`).join('') + '</tr></thead><tbody>';
   pag.slice.forEach(row => {
     h += '<tr>' + cols.map(c => {
       const v = row[c];
@@ -75,13 +75,47 @@ function renderReporte(data) {
   renderPaginacion('reporte', pag, 'paginaReporte');
 }
 
-function exportarReporteExcel() {
+const RP_ETIQ = { retencion_1:'Retención 1%', retencion_12_5:'Retención 12.5%', nombre_mes_factura:'Mes factura', nombre_cliente:'Cliente' };
+const rpTitulo = c => RP_ETIQ[c] || c.replace(/_/g, ' ').replace(/^./, s => s.toUpperCase());
+
+async function exportarReporteExcel() {
   const mes  = document.getElementById('rpMes').value;
   const anio = document.getElementById('rpAnio').value;
-  let url = `controllers/ReportesController.php?action=${reporteActual}&format=excel&anio=${anio}`;
+  let url = `controllers/ReportesController.php?action=${reporteActual}&anio=${anio}`;
   if (mes) url += '&mes=' + mes;
   url += _filtrosMovReporte();
-  window.location.href = url;
+  const r = await api(url);
+  if (!r.ok) { toast(r.data?.error || 'Error al generar el Excel.', 'error'); return; }
+  const rows = r.data.data || [];
+  if (!rows.length) { toast('Sin datos para exportar.', 'warn'); return; }
+
+  const cols = Object.keys(rows[0]);
+  const titulo = rpTitulo;
+  // Montos y cantidades como número; OT, contenedor, placa, factura, periodo, etc. se quedan como texto
+  const numerico = (c, v) => v !== null && v !== '' && /^-?\d+(\.\d+)?$/.test(String(v)) &&
+    (/\./.test(String(v)) || /^(cantidad|total|subtotal|isv|pagado|pendiente|saldo.*|monto.*|costo.*|utilidad|facturado|tarifa|diferencia|retencion.*)$/.test(c));
+  const data = [cols.map(titulo), ...rows.map(row => cols.map(c => {
+    const v = row[c];
+    if (v === null || v === undefined) return '';
+    return numerico(c, v) ? parseFloat(v) : v;
+  }))];
+
+  // Totales del reporte (si los tiene)
+  const tot = r.data.totales || (r.data.total_pendiente !== undefined ? { total_pendiente: r.data.total_pendiente } : null);
+  if (tot) {
+    data.push([]);
+    Object.entries(tot).forEach(([k, v]) => data.push([titulo(k), isNaN(parseFloat(v)) ? v : parseFloat(v)]));
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = cols.map((c, i) => ({ wch: Math.min(45, Math.max(titulo(c).length + 2, ...rows.slice(0, 200).map(x => String(x[c] ?? '').length + 2))) }));
+  ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rows.length, c: cols.length - 1 } }) };
+  const wb = XLSX.utils.book_new();
+  const nombre = { ventas:'Ventas', cxc:'Cuentas_por_Cobrar', retenciones:'Retenciones', rentabilidad:'Rentabilidad_OT', inventario:'Movimientos_Inventario', movimientos:'Movimientos_MAERSK_ALPLA', pagos:'Integracion_Pagos' }[reporteActual] || reporteActual;
+  XLSX.utils.book_append_sheet(wb, ws, nombre.slice(0, 31));
+  const periodo = reporteActual === 'cxc' ? new Date().toLocaleDateString('en-CA') : anio + (mes ? '-' + mes : '');
+  XLSX.writeFile(wb, `Reporte_${nombre}_${periodo}.xlsx`);
+  toast('Excel generado.', 'success');
 }
 
 // ── Loader + paginación ───────────────────────────────────

@@ -151,7 +151,12 @@ function puedeVerModulo(string $dataModule) {
         <svg class="nav-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
       <div class="nav-group-body">
-        <?php if (puedeVerModulo('planillas')): ?><a class="nav-item" data-module="planillas" title="Planilla"><span class="nav-icon">📋</span><span class="nav-text">Planilla</span></a><?php endif; ?>
+        <?php if (puedeVerModulo('planillas')): ?>
+        <a class="nav-item" data-module="planillas" data-tab="empleados" title="Empleados"><span class="nav-icon">👷</span><span class="nav-text">Empleados</span></a>
+        <a class="nav-item" data-module="planillas" data-tab="planillas" title="Planillas"><span class="nav-icon">📋</span><span class="nav-text">Planillas</span></a>
+        <a class="nav-item" data-module="planillas" data-tab="resumen" title="Resumen Mensual"><span class="nav-icon">📊</span><span class="nav-text">Resumen Mensual</span></a>
+        <a class="nav-item" data-module="planillas" data-tab="especiales" title="14vo y Aguinaldo"><span class="nav-icon">🎄</span><span class="nav-text">14vo &amp; Aguinaldo</span></a>
+        <?php endif; ?>
         <?php if (puedeVerModulo('vacaciones')): ?><a class="nav-item" data-module="vacaciones" title="Vacaciones"><span class="nav-icon">🏖️</span><span class="nav-text">Vacaciones</span></a><?php endif; ?>
         <?php if (puedeVerModulo('recibos')): ?><a class="nav-item" data-module="recibos" title="Recibos"><span class="nav-icon">🧾</span><span class="nav-text">Recibos</span></a><?php endif; ?>
         <?php if (puedeVerModulo('asistencia')): ?><a class="nav-item" data-module="asistencia" title="Tiempo Extra y Faltas"><span class="nav-icon">🕒</span><span class="nav-text">Tiempo Extra y Faltas</span></a><?php endif; ?>
@@ -172,7 +177,7 @@ function puedeVerModulo(string $dataModule) {
         <?php
         $menuReportes = [
           'ventas' => ['📈', 'Ventas'], 'cxc' => ['🕐', 'Cuentas x Cobrar'], 'retenciones' => ['📋', 'Retenciones'],
-          'rentabilidad' => ['💹', 'Rentabilidad OT'], 'inventario' => ['📦', 'Inventario'], 'movimientos' => ['🚛', 'Movimientos MAERSK / ALPLA'],
+          'rentabilidad' => ['💹', 'Rentabilidad OT'], 'inventario' => ['📦', 'Inventario'], 'movimientos' => ['🚛', 'Movimientos MAERSK / ALPLA'], 'pagos' => ['💵', 'Integración de Pagos'],
         ];
         foreach ($menuReportes as $rk => [$ri, $rl]):
           if (!tienePermiso($sesion['rol_id'], "reportes_$rk", 'puede_ver')) continue; ?>

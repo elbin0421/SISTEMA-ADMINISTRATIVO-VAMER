@@ -36,13 +36,66 @@ function filtrarEmpleados() {
   ));
 }
 
+// ── Foto de empleado ──────────────────────────────────────
+let _empFotoNueva = null, _empFotoQuitar = false;
+
+function empIniciales(e) {
+  return ((e.nombres || e.nombre || '?').trim()[0] || '?') + ((e.apellidos || '').trim()[0] || '');
+}
+function empAvatarHtml(e, size) {
+  const base = `width:${size}px;height:${size}px;border-radius:50%;flex-shrink:0;`;
+  if (e.foto) return `<img src="${e.foto}" alt="" onclick="verFotoEmpleado('${e.foto}')" style="${base}object-fit:cover;border:1px solid var(--border);cursor:zoom-in;display:block">`;
+  return `<div style="${base}display:flex;align-items:center;justify-content:center;background:var(--border);color:var(--muted);font-size:${Math.round(size * .38)}px;font-weight:700">${empIniciales(e).toUpperCase()}</div>`;
+}
+function verFotoEmpleado(src) {
+  const w = document.createElement('div');
+  w.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:99999;cursor:zoom-out';
+  w.onclick = () => w.remove();
+  w.innerHTML = `<img src="${src}" style="max-width:90vw;max-height:90vh;border-radius:10px">`;
+  document.body.appendChild(w);
+}
+function empPintarFotoModal(src, e) {
+  const box = document.getElementById('empFotoPreview');
+  box.innerHTML = src
+    ? `<img src="${src}" style="width:96px;height:96px;border-radius:50%;object-fit:cover;border:1px solid var(--border)">`
+    : `<div style="width:96px;height:96px;border-radius:50%;background:var(--border);color:var(--muted);display:flex;align-items:center;justify-content:center;font-size:32px">👤</div>`;
+  document.getElementById('empFotoQuitarBtn').style.display = src ? '' : 'none';
+}
+// Redimensiona a máx. 480 px y comprime a JPEG antes de enviar
+function empElegirFoto(input) {
+  const file = input.files && input.files[0]; input.value = '';
+  if (!file) return;
+  if (!/^image\//.test(file.type)) { toast('Selecciona una imagen.', 'warn'); return; }
+  const img = new Image(), url = URL.createObjectURL(file);
+  img.onload = () => {
+    const max = 480, k = Math.min(1, max / Math.max(img.width, img.height));
+    const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+    const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); ctx.drawImage(img, 0, 0, c.width, c.height);
+    URL.revokeObjectURL(url);
+    _empFotoNueva = c.toDataURL('image/jpeg', 0.85); _empFotoQuitar = false;
+    empPintarFotoModal(_empFotoNueva);
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); toast('No se pudo leer la imagen.', 'error'); };
+  img.src = url;
+}
+function empQuitarFoto() { _empFotoNueva = null; _empFotoQuitar = true; empPintarFotoModal(null); }
+async function empSubirFoto(id) {
+  if (_empFotoNueva) {
+    const r = await api('controllers/EmpleadoController.php?action=foto', { method: 'POST', body: JSON.stringify({ id, imagen: _empFotoNueva }) });
+    if (!r.ok) toast(r.data.error || 'No se pudo guardar la foto.', 'warn');
+  } else if (_empFotoQuitar) {
+    await api('controllers/EmpleadoController.php?action=foto_quitar', { method: 'POST', body: JSON.stringify({ id }) });
+  }
+  _empFotoNueva = null; _empFotoQuitar = false;
+}
+
 function renderTablaEmpleados(rows) {
   const pag = paginar('empleados', rows);
   let h = `<table><thead><tr>
-    <th>Nombre</th><th>Empresa</th><th>Ubicación</th><th>Departamento</th><th>Puesto</th><th>Contrato</th>
+    <th>Foto</th><th>Nombre</th><th>Empresa</th><th>Ubicación</th><th>Departamento</th><th>Puesto</th><th>Contrato</th>
     <th>Salario Mensual</th><th>Sal. Quincenal</th><th>Seguro</th><th>Estado</th><th>Acciones</th>
   </tr></thead><tbody>`;
-  if (!pag.slice.length) h += '<tr><td colspan="10" class="empty-state">Sin empleados</td></tr>';
+  if (!pag.slice.length) h += '<tr><td colspan="12" class="empty-state">Sin empleados</td></tr>';
   pag.slice.forEach(e => {
     const empresaBadge = e.empresa_nombre ? `<span class="badge badge-green">${e.empresa_nombre}</span>` : '—';
     const ubicBadge = e.ubicacion === 'VESTA'
@@ -51,6 +104,7 @@ function renderTablaEmpleados(rows) {
     const quince = fmtMoneda(parseFloat(e.salario_mensual||0)/2);
     const seguro = e.seguro_privado != null ? parseFloat(e.seguro_privado) : 0;
     h += `<tr>
+      <td>${empAvatarHtml(e, 40)}</td>
       <td><strong>${e.nombre}</strong>${e.identidad?`<br><small style="color:var(--muted)">${e.identidad}</small>`:''}</td>
       <td>${empresaBadge}</td>
       <td>${ubicBadge}</td>
@@ -100,6 +154,7 @@ async function cargarDepartamentosSelect(selectId, valorActual = '') {
 
 async function abrirModalEmpleado() {
   document.getElementById('empId').value = '';
+  _empFotoNueva = null; _empFotoQuitar = false; empPintarFotoModal(null);
   document.getElementById('tituloEmpleado').textContent = 'Nuevo Empleado';
   ['empNombres','empApellidos','empIdentidad','empTelefono','empCorreo','empDireccion',
    'empPuesto','empBanco','empCuenta','empIHSS','empRAP'].forEach(id => document.getElementById(id).value='');
@@ -123,6 +178,7 @@ async function editarEmpleado(id) {
   const e = r.data.data;
   document.getElementById('empId').value             = e.id_empleado;
   document.getElementById('tituloEmpleado').textContent = 'Editar — ' + e.nombre;
+  _empFotoNueva = null; _empFotoQuitar = false; empPintarFotoModal(e.foto || null);
   document.getElementById('empNombres').value   = e.nombres || '';
   document.getElementById('empApellidos').value = e.apellidos || '';
   document.getElementById('empUbicacion').value      = e.ubicacion  || 'SOLDYMEG';
@@ -181,7 +237,7 @@ async function guardarEmpleado() {
   };
   const action = id ? 'actualizar' : 'crear';
   const r = await api('controllers/EmpleadoController.php?action=' + action, {method:'POST',body:JSON.stringify(body)});
-  if (r.ok) { cerrarModal('modalEmpleado'); toast(id?'Empleado actualizado.':'Empleado creado.','success'); cargarEmpleados(); }
+  if (r.ok) { await empSubirFoto(id ? +id : r.data.id); cerrarModal('modalEmpleado'); toast(id?'Empleado actualizado.':'Empleado creado.','success'); cargarEmpleados(); }
   else { errEl.textContent = r.data.error||'Error.'; errEl.style.display='block'; }
 }
 
@@ -677,18 +733,14 @@ async function eliminarPlanilla(id) {
 }
 
 function switchTabPlanilla(tab) {
-  document.getElementById('tabEmpleados').classList.toggle('active',  tab==='empleados');
-  document.getElementById('tabPlanillas').classList.toggle('active',  tab==='planillas');
-  document.getElementById('tabEspeciales').classList.toggle('active', tab==='especiales');
-  document.getElementById('tabResumen').classList.toggle('active',    tab==='resumen');
   document.getElementById('panelResumen').style.display    = tab==='resumen'    ? '' : 'none';
   document.getElementById('panelEmpleados').style.display  = tab==='empleados'  ? '' : 'none';
   document.getElementById('panelPlanillas').style.display  = tab==='planillas'  ? '' : 'none';
   document.getElementById('panelEspeciales').style.display = tab==='especiales' ? '' : 'none';
   if (tab==='planillas')  cargarPlanillas();
-  if (tab==='empleados' && !empleadosData.length) cargarEmpleados();
   if (tab==='especiales') cargarEspeciales();
   if (tab==='resumen')    initResumenMensual();
+  // 'empleados' ya se carga en cargarModuloPlanillas()
 }
 
 

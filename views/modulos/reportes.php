@@ -12,6 +12,7 @@
       'rentabilidad' => ['id' => 'rptabRentabilidad',  'icono' => '💹', 'label' => 'Rentabilidad OT'],
       'inventario'   => ['id' => 'rptabInventario',    'icono' => '📦', 'label' => 'Inventario'],
       'movimientos'  => ['id' => 'rptabMovimientos',   'icono' => '🚛', 'label' => 'Movimientos MAERSK / ALPLA'],
+      'pagos'        => ['id' => 'rptabPagos',         'icono' => '💵', 'label' => 'Integración de Pagos'],
     ];
     $reportesVisibles = [];
     foreach ($subReportes as $key => $info) {
@@ -46,7 +47,7 @@
         <option value="todos">Estado: Todos (sin anulados)</option><option value="pendiente">Pendientes</option><option value="facturado">Facturados</option><option value="anulado">Anulados</option>
       </select>
       <button class="btn btn-primary" onclick="ejecutarReporte()">🔍 Consultar</button>
-      <button class="btn btn-secondary" onclick="exportarReporteExcel()">⬇️ Excel</button>
+      <button class="btn btn-secondary" onclick="exportarReporteExcel()" style="display:inline-flex;align-items:center;gap:6px"><img src="assets/img/excel.png" alt="" style="width:18px;height:18px"> Excel</button>
     </div>
 
     <!-- KPIs reporte -->
