@@ -14,6 +14,7 @@ foreach ($stmtPerm->fetchAll() as $p) { $permisosVer[$p['modulo']] = (bool)$p['p
 $moduloPermiso = [
     'usuarios'      => 'usuarios',
     'roles'         => 'roles',
+    'backups'       => 'backups',
     'clientes'      => 'clientes',
     'vehiculos'     => 'vehiculos',
     'inventario'    => 'inventario',
@@ -87,7 +88,7 @@ function puedeVerModulo(string $dataModule) {
     </a>
 
     <!-- ── 1. ADMINISTRACIÓN ── -->
-    <?php if (puedeVerModulo('usuarios') || puedeVerModulo('roles')): ?>
+    <?php if (puedeVerModulo('usuarios') || puedeVerModulo('roles') || puedeVerModulo('backups')): ?>
     <div class="nav-group" id="grp-admin">
       <div class="nav-group-header" onclick="toggleGrupo('admin')" title="Administración">
         <span class="nav-icon">⚙️</span>
@@ -97,6 +98,7 @@ function puedeVerModulo(string $dataModule) {
       <div class="nav-group-body">
         <?php if (puedeVerModulo('usuarios')): ?><a class="nav-item" data-module="usuarios" title="Usuarios"><span class="nav-icon">👥</span><span class="nav-text">Usuarios</span></a><?php endif; ?>
         <?php if (puedeVerModulo('roles')): ?><a class="nav-item" data-module="roles" title="Roles y Permisos"><span class="nav-icon">🔑</span><span class="nav-text">Roles y Permisos</span></a><?php endif; ?>
+        <?php if (puedeVerModulo('backups')): ?><a class="nav-item" data-module="backups" title="Respaldos"><span class="nav-icon">💾</span><span class="nav-text">Respaldos</span></a><?php endif; ?>
       </div>
     </div>
     <?php endif; ?>
@@ -217,7 +219,7 @@ function puedeVerModulo(string $dataModule) {
     $modulos = [
       'inicio','clientes','vehiculos','inventario','requisiciones','compras','proveedores',
       'ordenes','cotizaciones','movimientos','catalogo','facturacion','cai','libro_ventas',
-      'pagos','planillas','vacaciones','recibos','asistencia','marcaciones','gastos','reportes','usuarios_roles',
+      'pagos','planillas','vacaciones','recibos','asistencia','marcaciones','gastos','reportes','usuarios_roles','backups',
     ];
     foreach ($modulos as $mod) {
       $f = __DIR__ . "/views/modulos/{$mod}.php";
@@ -271,6 +273,7 @@ function puedeVerModulo(string $dataModule) {
 <script src="assets/js/modules/recibos.js"></script>
 <script src="assets/js/modules/asistencia.js"></script>
 <script src="assets/js/modules/marcaciones.js"></script>
+<script src="assets/js/modules/backups.js"></script>
 <script src="assets/js/modules/movimientos.js"></script>
 <script src="assets/js/modules/gastos.js"></script>
 <script src="assets/js/modules/catalogo.js"></script>
