@@ -14,7 +14,7 @@ const MODULE_GROUP = {
   cotizaciones: 'comercial', facturacion: 'comercial', cai: 'comercial',
   libro_ventas: 'comercial', pagos: 'comercial', gastos: 'comercial', catalogo: 'comercial',
   movimientos: 'comercial',
-  planillas: 'rrhh', vacaciones: 'rrhh',
+  planillas: 'rrhh', vacaciones: 'rrhh', carnets: 'rrhh',
   reportes: 'analisis',
 };
 
@@ -96,7 +96,7 @@ function updateClock() {
 updateClock(); setInterval(updateClock, 1000);
 
 // ── NAVEGACIÓN ───────────────────────────────────────────────
-const modTitles = { inicio:'Inicio', clientes:'Clientes', vehiculos:'Vehículos', inventario:'Inventario', requisiciones:'Requisiciones de Materiales', compras:'Compras', proveedores:'Proveedores', ordenes:'Órdenes de Trabajo', usuarios:'Usuarios', roles:'Roles y Permisos', cotizaciones:'Cotizaciones', movimientos:'Movimientos', catalogo:'Catálogo de Precios', facturacion:'Facturación', libro_ventas:'Libro de Ventas', vacaciones:'Vacaciones', recibos:'Recibos', asistencia:'Tiempo Extra y Días Faltados', marcaciones:'Asistencia Diaria', backups:'Respaldos de la Base de Datos', gastos:'Gastos DMC / SAR Honduras' };
+const modTitles = { inicio:'Inicio', clientes:'Clientes', vehiculos:'Vehículos', inventario:'Inventario', requisiciones:'Requisiciones de Materiales', compras:'Compras', proveedores:'Proveedores', ordenes:'Órdenes de Trabajo', usuarios:'Usuarios', roles:'Roles y Permisos', cotizaciones:'Cotizaciones', movimientos:'Movimientos', catalogo:'Catálogo de Precios', facturacion:'Facturación', libro_ventas:'Libro de Ventas', vacaciones:'Vacaciones', recibos:'Recibos', asistencia:'Tiempo Extra y Días Faltados', marcaciones:'Asistencia Diaria', backups:'Respaldos de la Base de Datos', carnets:'Carnets de Empleados', gastos:'Gastos DMC / SAR Honduras' };
 document.querySelectorAll('.nav-item[data-module]').forEach(el => {
   el.addEventListener('click', function() {
     const mod = this.dataset.module;
@@ -113,6 +113,7 @@ document.querySelectorAll('.nav-item[data-module]').forEach(el => {
     const loaders = {
       clientes: cargarClientes, vehiculos: cargarVehiculos, inventario: cargarInventario, compras: cargarCompras,
       proveedores: cargarProveedores, ordenes: cargarOrdenes, usuarios: cargarUsuarios,
+      carnets: () => { if (typeof cargarCarnets === 'function') cargarCarnets(); },
       backups: () => { if (typeof cargarBackups === 'function') cargarBackups(); },
       roles: cargarRoles, cotizaciones: cargarCotizaciones, facturacion: cargarFacturacion,
       catalogo: cargarCatalogo, requisiciones: cargarRequisiciones,

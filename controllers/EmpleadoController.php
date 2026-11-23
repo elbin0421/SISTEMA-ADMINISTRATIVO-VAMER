@@ -65,12 +65,12 @@ function cambiarEstado(array $sesion): void {
     EmpleadoModel::cambiarEstado($id, $estado);
     responder(200, ['ok' => true]);
 }
-function fotoDir(): string { return __DIR__ . '/../uploads/empleados/'; }
+function fotoDir(): string { return __DIR__ . '/../assets/uploads/empleados/'; }
 
 function borrarFotoActual(int $id): void {
     $st = getDB()->prepare("SELECT foto FROM empleados WHERE id_empleado = ?"); $st->execute([$id]);
     $f = $st->fetchColumn();
-    if ($f && preg_match('#^uploads/empleados/emp_\d+_\d+\.(jpg|png|webp)$#', $f) && is_file(__DIR__ . '/../' . $f)) @unlink(__DIR__ . '/../' . $f);
+    if ($f && preg_match('#^(assets/)?uploads/empleados/emp_\d+_\d+\.(jpg|png|webp)$#', $f) && is_file(__DIR__ . '/../' . $f)) @unlink(__DIR__ . '/../' . $f);
 }
 function subirFoto(array $sesion): void {
     requirePermiso($sesion['rol_id'], 'planillas', 'puede_editar');
@@ -83,12 +83,12 @@ function subirFoto(array $sesion): void {
     $info = @getimagesizeFromString($bin);
     $ext = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'][$info['mime'] ?? ''] ?? null;
     if (!$ext) { responder(400, ['error' => 'El archivo no es una imagen válida']); return; }
-    if (!is_dir(fotoDir()) && !@mkdir(fotoDir(), 0755, true)) { responder(500, ['error' => 'No se pudo crear la carpeta uploads/empleados']); return; }
+    if (!is_dir(fotoDir()) && !@mkdir(fotoDir(), 0755, true)) { responder(500, ['error' => 'No se pudo crear la carpeta assets/uploads/empleados']); return; }
     $nombre = "emp_{$id}_" . time() . ".$ext";
-    if (@file_put_contents(fotoDir() . $nombre, $bin) === false) { responder(500, ['error' => 'No se pudo guardar la foto (revisa permisos de uploads/empleados)']); return; }
+    if (@file_put_contents(fotoDir() . $nombre, $bin) === false) { responder(500, ['error' => 'No se pudo guardar la foto (revisa permisos de assets/uploads/empleados)']); return; }
     borrarFotoActual($id);
-    getDB()->prepare("UPDATE empleados SET foto = ? WHERE id_empleado = ?")->execute(["uploads/empleados/$nombre", $id]);
-    responder(200, ['ok' => true, 'foto' => "uploads/empleados/$nombre"]);
+    getDB()->prepare("UPDATE empleados SET foto = ? WHERE id_empleado = ?")->execute(["assets/uploads/empleados/$nombre", $id]);
+    responder(200, ['ok' => true, 'foto' => "assets/uploads/empleados/$nombre"]);
 }
 function quitarFoto(array $sesion): void {
     requirePermiso($sesion['rol_id'], 'planillas', 'puede_editar');

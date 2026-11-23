@@ -1,9 +1,5 @@
 <div class="module" id="mod-reportes">
   <div class="card">
-    <div class="card-header">
-      <h4>📊 Reportes</h4>
-    </div>
-
     <?php
     $subReportes = [
       'ventas'       => ['id' => 'rptabVentas',       'icono' => '📈', 'label' => 'Ventas'],
