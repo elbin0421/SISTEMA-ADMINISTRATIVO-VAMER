@@ -122,7 +122,8 @@ function crFmtIngreso(f) { if (!f) return ''; const [y, m, d] = f.split('-'); re
 function crFmtFecha(f) { const [y, m, d] = f.split('-'); return `${d}/${m}/${y}`; }
 function crDatos() {
   const e = crEmp, c = crC, em = crEmpresa || {};
-  const pn = (e.nombres || '').trim().split(/\s+/)[0] || '', pa = (e.apellidos || '').trim().split(/\s+/)[0] || '';
+  /*const pn = (e.nombres || '').trim().split(/\s+/)[0] || '', pa = (e.apellidos || '').trim().split(/\s+/)[0] || '';*/
+  const pn = (e.nombres || '').trim()|| '', pa = (e.apellidos || '')|| '';
   const empresa = em.nombre_mostrado || e.empresa || '';
   return {
     nombre: c.nombre_carnet || `${pn} ${pa}`.trim(), identidad: c.mostrar_identidad ? (e.identidad || '') : '',

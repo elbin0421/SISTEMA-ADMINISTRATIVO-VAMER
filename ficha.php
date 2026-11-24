@@ -14,7 +14,7 @@ if (!$f) { http_response_code(404); }
 $activo = $f && $f['estado'] === 'activo';
 $nombre = $f ? trim($f['nombres'] . ' ' . $f['apellidos']) : '';
 $id = $f ? (string)$f['identidad'] : '';
-$idMask = $id !== '' ? str_repeat('•', max(0, strlen($id) - 4)) . substr($id, -4) : '';
+/*$idMask = $id !== '' ? str_repeat('•', max(0, strlen($id) - 4)) . substr($id, -4) : '';*/
 $tel = $f ? ($f['telefono_carnet'] ?: $f['telefono']) : '';
 $ingreso = ($f && $f['fecha_ingreso']) ? (int)date('j', strtotime($f['fecha_ingreso'])) . ' de ' . $meses[(int)date('n', strtotime($f['fecha_ingreso'])) - 1] . ' de ' . date('Y', strtotime($f['fecha_ingreso'])) : '';
 ?><!DOCTYPE html>
@@ -56,7 +56,7 @@ $ingreso = ($f && $f['fecha_ingreso']) ? (int)date('j', strtotime($f['fecha_ingr
     <dl>
       <?php if ($f['departamento']): ?><div><dt>Departamento</dt><dd><?= $h($f['departamento']) ?></dd></div><?php endif; ?>
       <div><dt>Empresa</dt><dd><?= $h($f['empresa']) ?></dd></div>
-      <?php if ($f['mostrar_identidad'] && $idMask): ?><div><dt>Identidad</dt><dd><?= $h($idMask) ?></dd></div><?php endif; ?>
+      <?php if ($f['mostrar_identidad'] && $id): ?><div><dt>Identidad</dt><dd><?= $h($id) ?></dd></div><?php endif; ?>
       <?php if ($f['mostrar_telefono'] && $tel): ?><div><dt>Teléfono</dt><dd><?= $h($tel) ?></dd></div><?php endif; ?>
       <?php if ($f['mostrar_ingreso'] && $ingreso): ?><div><dt>Ingreso</dt><dd><?= $h($ingreso) ?></dd></div><?php endif; ?>
     </dl>
