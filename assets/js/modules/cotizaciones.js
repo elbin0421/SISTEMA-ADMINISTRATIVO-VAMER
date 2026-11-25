@@ -262,6 +262,7 @@ async function generarCotizacionDesdeOT(orden_id) {
 
 // ── COTIZACIÓN DIRECTA ───────────────────────────────────────
 function abrirModalCotizacionDirecta() {
+  window.__solCotId = null;   // se asigna después si viene desde una Solicitud
   itemsCotDir = [];
   document.getElementById('cotDirClienteBuscar').value = '';
   document.getElementById('cotDirClienteId').value = '';
@@ -443,6 +444,7 @@ async function guardarCotizacionDirecta() {
   if (r.ok) {
     cerrarModal('modalCotizacionDirecta');
     toast(`Cotización ${r.data.cotizacion.numero_cotizacion} creada.`, 'success');
+    if (window.__solCotId && typeof solicitudVincularCot === 'function') solicitudVincularCot(r.data.cotizacion.id_cotizacion || r.data.cotizacion.id);
     cargarCotizaciones();
   } else { errEl.textContent = r.data.error || 'Error.'; errEl.style.display = 'block'; }
 }

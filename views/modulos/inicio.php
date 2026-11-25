@@ -1,5 +1,13 @@
 <div class="module active" id="mod-inicio">
 
+  <!-- Notificaciones: solicitudes pendientes -->
+  <!--<div id="notifSolWrap" style="display:none;position:relative;display:none;justify-content:flex-end;margin-bottom:12px">
+    <button class="btn btn-secondary" id="notifSolBtn" onclick="toggleNotifSol()" style="position:relative">
+      🔔 Solicitudes <span id="notifSolBadge" class="badge badge-red" style="margin-left:6px;display:none">0</span>
+    </button>
+    <div id="notifSolPanel" style="display:none;position:absolute;right:0;top:100%;margin-top:6px;z-index:60;width:380px;max-width:92vw;max-height:420px;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.4)"></div>
+  </div>-->
+
   <!-- KPIs -->
   <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:14px;margin-bottom:20px">
     <div class="kpi-card" style="border-left:4px solid var(--accent)">

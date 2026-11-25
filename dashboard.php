@@ -21,6 +21,7 @@ $moduloPermiso = [
     'requisiciones' => 'requisiciones',
     'compras'       => 'compras',
     'proveedores'   => 'proveedores',
+    'solicitudes'   => 'solicitudes',
     'ordenes'       => 'ordenes_trabajo',
     'cotizaciones'  => 'cotizaciones',
     'movimientos'   => 'movimientos',
@@ -105,7 +106,7 @@ function puedeVerModulo(string $dataModule) {
     <?php endif; ?>
 
     <!-- ── 2. OPERACIONES ── -->
-    <?php if (puedeVerModulo('clientes') || puedeVerModulo('vehiculos') || puedeVerModulo('inventario') || puedeVerModulo('requisiciones') || puedeVerModulo('compras') || puedeVerModulo('proveedores') || puedeVerModulo('ordenes')): ?>
+    <?php if (puedeVerModulo('clientes') || puedeVerModulo('vehiculos') || puedeVerModulo('inventario') || puedeVerModulo('requisiciones') || puedeVerModulo('compras') || puedeVerModulo('proveedores') || puedeVerModulo('ordenes') || puedeVerModulo('solicitudes')): ?>
     <div class="nav-group" id="grp-operaciones">
       <div class="nav-group-header" onclick="toggleGrupo('operaciones')" title="Operaciones">
         <span class="nav-icon">🔧</span>
@@ -119,6 +120,7 @@ function puedeVerModulo(string $dataModule) {
         <?php if (puedeVerModulo('requisiciones')): ?><a class="nav-item" data-module="requisiciones" title="Requisiciones de Materiales"><span class="nav-icon">📋</span><span class="nav-text">Requisiciones</span></a><?php endif; ?>
         <?php if (puedeVerModulo('compras')): ?><a class="nav-item" data-module="compras"     title="Compras"><span class="nav-icon">🛒</span><span class="nav-text">Compras</span></a><?php endif; ?>
         <?php if (puedeVerModulo('proveedores')): ?><a class="nav-item" data-module="proveedores" title="Proveedores"><span class="nav-icon">🏭</span><span class="nav-text">Proveedores</span></a><?php endif; ?>
+        <?php if (puedeVerModulo('solicitudes')): ?><a class="nav-item" data-module="solicitudes" title="Solicitudes"><span class="nav-icon">📝</span><span class="nav-text">Solicitudes</span></a><?php endif; ?>
         <?php if (puedeVerModulo('ordenes')): ?><a class="nav-item" data-module="ordenes"     title="Órdenes de Trabajo"><span class="nav-icon">🔩</span><span class="nav-text">Órdenes de Trabajo</span></a><?php endif; ?>
       </div>
     </div>
@@ -208,19 +210,33 @@ function puedeVerModulo(string $dataModule) {
 <!-- MAIN -->
 <div id="main">
   <div class="topbar">
-    <div class="topbar-left">
-      <button id="btnMenuToggleTop" class="topbar-menu-btn" title="Menú">
-        <div class="hbr"><span></span><span></span><span></span></div>
+  <div class="topbar-left">
+    <button id="btnMenuToggleTop" class="topbar-menu-btn" title="Menú">
+      <div class="hbr"><span></span><span></span><span></span></div>
+    </button>
+    <h3 id="topbarTitle">Inicio</h3>
+  </div>
+
+  <!-- Contenedor derecho: agrupa Solicitudes y la Fecha -->
+  <div class="topbar-right" style="display:flex; align-items:center; gap:14px; margin-left:auto;">
+    
+    <!-- Notificaciones: solicitudes pendientes -->
+    <div id="notifSolWrap" style="display:none; position:relative;">
+      <button class="btn btn-secondary" id="notifSolBtn" onclick="toggleNotifSol()" style="position:relative">
+        🔔 Solicitudes <span id="notifSolBadge" class="badge badge-red" style="margin-left:6px;display:none">0</span>
       </button>
-      <h3 id="topbarTitle">Inicio</h3>
+      <div id="notifSolPanel" style="display:none;position:absolute;right:0;top:100%;margin-top:6px;z-index:60;width:380px;max-width:92vw;max-height:420px;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.4)"></div>
     </div>
+
     <span class="clock" id="clock"></span>
   </div>
+</div>
+  <
   <div class="content">
     <?php
     $modulos = [
       'inicio','clientes','vehiculos','inventario','requisiciones','compras','proveedores',
-      'ordenes','cotizaciones','movimientos','catalogo','facturacion','cai','libro_ventas',
+      'solicitudes','ordenes','cotizaciones','movimientos','catalogo','facturacion','cai','libro_ventas',
       'pagos','planillas','vacaciones','recibos','asistencia','marcaciones','carnets','gastos','reportes','usuarios_roles','backups',
     ];
     foreach ($modulos as $mod) {
@@ -230,7 +246,7 @@ function puedeVerModulo(string $dataModule) {
 
     $modales = [
       'clientes','vehiculos','inventario','compras_proveedores',
-      'ordenes','cotizaciones','movimientos','catalogo_precios','facturacion',
+      'solicitudes','ordenes','cotizaciones','movimientos','catalogo_precios','facturacion',
       'pagos','planillas','planillas_especiales','vacaciones','recibos','asistencia','marcaciones','carnets','gastos','usuarios','requisicion',
     ];
     foreach ($modales as $modal) {
@@ -260,6 +276,7 @@ function puedeVerModulo(string $dataModule) {
 <script src="assets/js/modules/inventario.js"></script>
 <script src="assets/js/modules/proveedores.js"></script>
 <script src="assets/js/modules/compras.js"></script>
+<script src="assets/js/modules/solicitudes.js"></script>
 <script src="assets/js/modules/ordenes.js"></script>
 <script src="assets/js/modules/usuarios.js"></script>
 <script src="assets/js/modules/cotizaciones.js"></script>

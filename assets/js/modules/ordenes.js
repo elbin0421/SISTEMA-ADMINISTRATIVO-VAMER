@@ -118,6 +118,7 @@ function sincronizarOtDesc() {
 }
 
 async function abrirModalOT() {
+  window.__solOtId = null;   // se asigna después si viene desde una Solicitud
   try { await cargarTecnicosCache(true); } catch(e) { tecnicosCache = []; }
   document.getElementById('otId').value='';
   lineasTrabajo = [];
@@ -275,6 +276,7 @@ async function guardarOT() {
       for (const f of fotosOTPendientes) { await subirFotoOT(nuevoId, f.dataUrl, f.nombre); }
       fotosOTPendientes = [];
     }
+    if (!id && window.__solOtId && typeof solicitudVincularOT === 'function') solicitudVincularOT(+nuevoId);
     cerrarModal('modalOT'); toast(id?'OT actualizada.':'OT creada correctamente.','success'); cargarOrdenes();
   }
   else { errEl.textContent=r.data?.error||'Error al guardar la OT.'; errEl.style.display='block'; }

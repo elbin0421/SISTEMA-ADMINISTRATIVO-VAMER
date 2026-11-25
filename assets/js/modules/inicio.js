@@ -12,6 +12,7 @@ function navegarModulo(mod) {
 }
 
 async function cargarInicio() {
+  if (typeof cargarNotifSolicitudes === 'function') cargarNotifSolicitudes();
   const [rKpi, rGraf] = await Promise.all([
     api('controllers/DashboardController.php?action=kpis'),
     api('controllers/DashboardController.php?action=grafico_ventas'),
