@@ -560,7 +560,7 @@ async function verDetalleOT(id) {
     btnCot.onclick = () => generarCotizacionDesdeOT(currentOTId);
     document.getElementById('modalDetalleOT').querySelector('.modal-footer').prepend(btnCot);
   }
-  btnCot.style.display = (o.estado === 'finalizada') ? 'inline-flex' : 'none';
+  btnCot.style.display = (o.estado === 'finalizada' && !o.cotizacion_origen_id) ? 'inline-flex' : 'none';
 }
 
 let currentOTId = null;
@@ -663,8 +663,10 @@ async function cambiarEstadoOT(id, estado) {
   const labels = { en_proceso:'iniciar esta OT', finalizada:'marcar esta OT como finalizada', anulada:'anular esta OT' };
   if (!await confirmDialog(`¿Deseas ${labels[estado]||'cambiar el estado'}?`)) return;
   const r = await api('controllers/OrdenesController.php?action=cambiar_estado', { method:'POST', body:JSON.stringify({id, estado}) });
-  if (r.ok) { toast('Estado actualizado.','success'); cargarOrdenes(); }
-  else toast(r.data.error||'Error.','error');
+  if (r.ok) {
+    toast(r.data.cotizacion_lista ? `OT finalizada. La cotización ${r.data.cotizacion_lista} ya está lista para facturar.` : 'Estado actualizado.','success');
+    cargarOrdenes();
+  } else toast(r.data.error||'Error.','error');
 }
 
 

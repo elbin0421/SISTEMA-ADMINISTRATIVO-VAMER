@@ -33,6 +33,9 @@ function filtrarCotizaciones() {
   ));
 }
 
+// O.T. originada por la cotización que aún no está finalizada (bloquea facturar)
+function cotOtPendiente(c) { return c.ot_origen_estado && !['finalizada', 'cotizado', 'facturada'].includes(c.ot_origen_estado); }
+
 function renderTablaCotizaciones(rows) {
   const pag = paginar('cotizaciones', rows);
   let h = '<table><thead><tr><th>Número</th><th>Cliente</th><th>Unidad</th><th>OT Cliente</th><th>OC</th><th>Modo</th><th>Fecha</th><th>Total</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>';
@@ -40,12 +43,15 @@ function renderTablaCotizaciones(rows) {
   pag.slice.forEach(c => {
     const estadosBtns=[];
     const esAdmin=(rol||'').toLowerCase()==='administrador';
+    if(c.estado==='borrador') estadosBtns.push(`<button class="btn btn-sm btn-secondary" onclick="editarCotizacion(${c.id_cotizacion})">✏️ Editar</button>`,`<button class="btn btn-sm btn-success" onclick="cambiarEstadoCot(${c.id_cotizacion},'pendiente_aprobacion')">📤 Solicitar Aprobación</button>`);
     if(c.estado==='pendiente') estadosBtns.push(`<button class="btn btn-sm btn-secondary" onclick="cambiarEstadoCot(${c.id_cotizacion},'pendiente_aprobacion')">📤 Solicitar Aprobación</button>`);
     if(c.estado==='pendiente_aprobacion'&&esAdmin) estadosBtns.push(`<button class="btn btn-sm btn-success" onclick="cambiarEstadoCot(${c.id_cotizacion},'aprobada')">✓ Aprobar</button>`,`<button class="btn btn-sm btn-danger" onclick="cambiarEstadoCot(${c.id_cotizacion},'rechazada')">✗ Rechazar</button>`);
     if(c.estado==='pendiente_aprobacion'&&!esAdmin) estadosBtns.push(`<span style="font-size:11px;color:var(--muted);padding:4px 8px">⏳ Esperando aprobación</span>`);
     if(c.estado==='aprobada') estadosBtns.push(`<button class="btn btn-sm btn-secondary" onclick="cambiarEstadoCot(${c.id_cotizacion},'enviada')">📨 Marcar Enviada</button>`);
     if(c.estado==='enviada') estadosBtns.push(`<button class="btn btn-sm btn-success" onclick="cambiarEstadoCot(${c.id_cotizacion},'aprobada_cliente')">✅ Aprobada por Cliente</button>`,`<button class="btn btn-sm btn-danger" onclick="cambiarEstadoCot(${c.id_cotizacion},'rechazada')">✗ Rechazada por Cliente</button>`);
-    if(c.estado==='aprobada_cliente') estadosBtns.push(`<span class="badge badge-green" style="padding:5px 10px">✅ Listo para facturar</span>`);
+    if(c.estado==='aprobada_cliente') estadosBtns.push(cotOtPendiente(c)
+      ? `<span class="badge badge-yellow" style="padding:5px 10px" title="Se habilita al finalizar la O.T.">🔧 ${c.ot_origen_numero} en proceso — factura al finalizarla</span>`
+      : `<span class="badge badge-green" style="padding:5px 10px">✅ Listo para facturar</span>`);
     h += `<tr>
       <td><strong>${c.numero_cotizacion}</strong></td>
       <td>${c.cliente}</td>
@@ -140,6 +146,7 @@ async function verDetalleCot(id) {
     <strong style="font-size:16px;color:var(--accent)">TOTAL: ${fmtMoneda(c.total)}</strong>
   </div>`;
   if (c.observaciones) h += `<p style="font-size:12px;color:var(--muted);margin-top:10px">${c.observaciones}</p>`;
+  if (c.ot_origen_numero) h += `<p style="font-size:12px;margin-top:8px">🔧 O.T. activada: <strong>${c.ot_origen_numero}</strong> (${c.ot_origen_estado}). ${cotOtPendiente(c) ? 'La facturación se habilita al finalizarla.' : ''}</p>`;
   document.getElementById('contenidoDetalleCot').innerHTML = h;
 
   // Botón "Facturar" — solo si cotización está aprobada
@@ -153,7 +160,7 @@ async function verDetalleCot(id) {
     document.getElementById('footerDetalleCot').prepend(btnFac);
   }
   currentCotId = c.id_cotizacion;
-  btnFac.style.display = c.estado === 'aprobada_cliente' ? 'inline-flex' : 'none';
+  btnFac.style.display = (c.estado === 'aprobada_cliente' && !cotOtPendiente(c)) ? 'inline-flex' : 'none';
 
   // Botones PDF y Excel en footer (crear si no existen)
   const footerCot = document.getElementById('footerDetalleCot');
@@ -207,11 +214,13 @@ async function cambiarEstadoCot(id, estado) {
   }
   const esAdmin=(rol||'').toLowerCase()==='administrador';
   if(estado==='aprobada'&&!esAdmin){toast('Solo el Administrador puede aprobar cotizaciones.','error');return;}
-  const labels={pendiente_aprobacion:'enviar a aprobación del Administrador',aprobada:'aprobar esta cotización',enviada:'marcar como enviada al cliente',aprobada_cliente:'registrar que el cliente aprobó (habilitará Facturar)',rechazada:'registrar el rechazo'};
+  const labels={pendiente_aprobacion:'enviar a aprobación del Administrador',aprobada:'aprobar esta cotización',enviada:'marcar como enviada al cliente',aprobada_cliente:'registrar que el cliente aprobó (se activará la O.T. y, al finalizarla, se habilitará Facturar)',rechazada:'registrar el rechazo'};
   if(!await confirmDialog(`¿Deseas ${labels[estado]||'cambiar el estado de esta cotización'}?`))return;
   const r=await api('controllers/CotizacionesController.php?action=cambiar_estado',{method:'POST',body:JSON.stringify({id,estado})});
-  if(r.ok){toast('Estado actualizado.','success');cargarCotizaciones();}
-  else toast(r.data.error||'Error.','error');
+  if(r.ok){
+    toast(r.data.orden ? `Cotización aprobada. Se activó la ${r.data.orden.numero_orden} (en proceso).` : 'Estado actualizado.','success');
+    cargarCotizaciones();
+  } else toast(r.data.error||'Error.','error');
 }
 
 function pedirMotivoRechazo() {
@@ -261,8 +270,39 @@ async function generarCotizacionDesdeOT(orden_id) {
 }
 
 // ── COTIZACIÓN DIRECTA ───────────────────────────────────────
+let cotDirEditId = null;   // id de la cotización en edición (null = nueva)
+function cotDirModoEdicion(id) {
+  cotDirEditId = id || null;
+  document.getElementById('tituloCotDir').textContent = id ? '✏️ Editar Cotización (borrador)' : '📑 Nueva Cotización Directa';
+  document.getElementById('btnGuardarCotDir').textContent = id ? '💾 Guardar cambios' : '💾 Generar Cotización';
+  document.getElementById('cotDirClienteBuscar').readOnly = !!id;
+}
+
+async function editarCotizacion(id) {
+  const r = await api('controllers/CotizacionesController.php?action=obtener&id=' + id);
+  if (!r.ok) { toast(r.data?.error || 'No se pudo cargar la cotización.', 'error'); return; }
+  const c = r.data.data;
+  if (c.estado !== 'borrador') { toast('Solo se puede editar una cotización en borrador.', 'warn'); return; }
+  abrirModalCotizacionDirecta();
+  cotDirModoEdicion(id);
+  const set = (i, v) => { const el = document.getElementById(i); if (el) el.value = v ?? ''; };
+  set('cotDirClienteId', c.cliente_id); set('cotDirClienteBuscar', c.cliente);
+  set('cotDirVigencia', c.vigencia_dias); set('cotDirObs', c.observaciones);
+  set('cotDirOtCliente', c.ot_cliente); set('cotDirOrdenCompra', c.orden_compra); set('cotDirPlaca', c.unidad);
+  set('cotDirDescPct', c.descuento_porcentaje || 0);
+  itemsCotDir = c.detalle.map(d => {
+    const cant = parseFloat(d.cantidad) || 1;
+    return { descripcion: d.descripcion, tipo: d.tipo === 'mano_obra' ? 'mano_obra' : 'material', cantidad: cant,
+             precio_unitario: Math.round((parseFloat(d.subtotal_base) / cant) * 10000) / 10000,
+             descuento_porcentaje: parseFloat(d.descuento_porcentaje) || 0, descuento_monto: parseFloat(d.descuento_monto) || 0 };
+  });
+  renderItemsCotDir();
+  cargarVehiculosCotDir(c.cliente_id);
+}
+
 function abrirModalCotizacionDirecta() {
   window.__solCotId = null;   // se asigna después si viene desde una Solicitud
+  cotDirModoEdicion(null);
   itemsCotDir = [];
   document.getElementById('cotDirClienteBuscar').value = '';
   document.getElementById('cotDirClienteId').value = '';
@@ -438,6 +478,13 @@ async function guardarCotizacionDirecta() {
     descuento_monto:       parseFloat(document.getElementById('cotDirDescMto').value) || 0,
     items: itemsCotDir,
   };
+  if (cotDirEditId) {
+    const re = await api('controllers/CotizacionesController.php?action=editar', { method: 'POST', body: JSON.stringify({ ...body, id: cotDirEditId }) });
+    if (!re.ok) { errEl.textContent = re.data.error || 'Error.'; errEl.style.display = 'block'; return; }
+    cerrarModal('modalCotizacionDirecta'); cotDirModoEdicion(null);
+    toast('Cotización actualizada. Cuando esté lista, solicita su aprobación.', 'success'); cargarCotizaciones();
+    return;
+  }
   const r = await api('controllers/CotizacionesController.php?action=directa', {
     method: 'POST', body: JSON.stringify(body)
   });

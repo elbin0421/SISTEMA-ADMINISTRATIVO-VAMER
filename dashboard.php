@@ -231,7 +231,6 @@ function puedeVerModulo(string $dataModule) {
     <span class="clock" id="clock"></span>
   </div>
 </div>
-  <
   <div class="content">
     <?php
     $modulos = [

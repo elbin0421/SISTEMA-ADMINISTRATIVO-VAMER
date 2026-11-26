@@ -39,18 +39,25 @@ class OrdenService {
 
         // Validaciones adicionales por estado
         if ($nuevo_estado === 'finalizada') {
-            if (empty($ot['mano_obra']) && empty($ot['materiales'])) {
+            if (empty($ot['mano_obra']) && empty($ot['materiales']) && empty($ot['cotizacion_origen_id'])) {
                 throw new Exception('No se puede finalizar una OT sin materiales ni mano de obra.');
             }
         }
 
         OrdenModel::cambiarEstado($orden_id, $nuevo_estado);
 
-        return [
+        $res = [
             'ok'             => true,
             'estado_anterior' => $estado_actual,
             'estado_nuevo'    => $nuevo_estado,
         ];
+        // O.T. originada por una cotización aprobada: al finalizar queda habilitada la facturación
+        if ($nuevo_estado === 'finalizada' && !empty($ot['cotizacion_origen_id'])) {
+            $st = getDB()->prepare("SELECT numero_cotizacion FROM cotizaciones WHERE id_cotizacion=?");
+            $st->execute([$ot['cotizacion_origen_id']]);
+            $res['cotizacion_lista'] = $st->fetchColumn() ?: null;
+        }
+        return $res;
     }
 
     /**

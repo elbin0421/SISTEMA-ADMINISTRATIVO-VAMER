@@ -77,6 +77,7 @@ class FacturaModel {
         if ($cot['estado'] !== 'aprobada_cliente') {
             throw new Exception('Solo se puede facturar una cotización aprobada. Estado actual: ' . $cot['estado']);
         }
+        if ($bloq = CotizacionModel::bloqueoFacturacion($cotizacion_id)) throw new Exception($bloq);
 
         // Verificar que no exista ya una factura activa para esta cotización
         $chk = $pdo->prepare(
@@ -166,6 +167,9 @@ class FacturaModel {
             $pdo->prepare("UPDATE cotizaciones SET estado='facturada' WHERE id_cotizacion=?")
                 ->execute([$cotizacion_id]);
 
+            // O.T. originada por esta cotización → facturada
+            $pdo->prepare("UPDATE ordenes_trabajo SET estado='facturada' WHERE cotizacion_origen_id=? AND estado IN ('finalizada','cotizado')")
+                ->execute([$cotizacion_id]);
             // Marcar OT como facturada (si tiene)
             if ($cot['orden_id']) {
                 $pdo->prepare("UPDATE ordenes_trabajo SET estado='facturada' WHERE id_orden=?")
@@ -229,6 +233,10 @@ class FacturaModel {
                     ->execute([$cotizacion_id]);
             }
 
+            if ($cotizacion_id) {
+                $pdo->prepare("UPDATE ordenes_trabajo SET estado='finalizada' WHERE cotizacion_origen_id=? AND estado='facturada'")
+                    ->execute([$cotizacion_id]);
+            }
             // Revertir OT a estado cotizado si aplica
             if ($f['orden_id']) {
                 $pdo->prepare("UPDATE ordenes_trabajo SET estado='cotizado' WHERE id_orden=? AND estado='facturada'")

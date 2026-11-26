@@ -22,7 +22,9 @@ class CotizacionModel {
                    cot.ot_cliente, cot.orden_compra, cot.unidad, cot.motivo_rechazo,
                    cot.elaborado_por, cot.telefono_elaborado,
                    cl.nombre AS cliente,
-                   ot.numero_orden
+                   ot.numero_orden,
+                   (SELECT o2.numero_orden FROM ordenes_trabajo o2 WHERE o2.cotizacion_origen_id = cot.id_cotizacion AND o2.estado <> 'anulada' ORDER BY o2.id_orden DESC LIMIT 1) AS ot_origen_numero,
+                   (SELECT o2.estado       FROM ordenes_trabajo o2 WHERE o2.cotizacion_origen_id = cot.id_cotizacion AND o2.estado <> 'anulada' ORDER BY o2.id_orden DESC LIMIT 1) AS ot_origen_estado
             FROM cotizaciones cot
             JOIN clientes cl ON cl.id_cliente = cot.cliente_id
             LEFT JOIN ordenes_trabajo ot ON ot.id_orden = cot.orden_id
@@ -48,6 +50,13 @@ class CotizacionModel {
         $stmt->execute([$id]);
         $cot = $stmt->fetch();
         if (!$cot) return null;
+
+        $o = $pdo->prepare("SELECT id_orden, numero_orden, estado FROM ordenes_trabajo WHERE cotizacion_origen_id = ? AND estado <> 'anulada' ORDER BY id_orden DESC LIMIT 1");
+        $o->execute([$id]);
+        $ot = $o->fetch();
+        $cot['ot_origen_id']     = $ot['id_orden']     ?? null;
+        $cot['ot_origen_numero'] = $ot['numero_orden'] ?? null;
+        $cot['ot_origen_estado'] = $ot['estado']       ?? null;
 
         $s = $pdo->prepare("SELECT * FROM detalle_cotizacion WHERE cotizacion_id = ?");
         $s->execute([$id]);
@@ -101,6 +110,9 @@ class CotizacionModel {
         if ($ot['estado'] !== 'finalizada') {
             throw new Exception('Solo se puede cotizar una OT en estado finalizada.');
         }
+        if (!empty($ot['cotizacion_origen_id'])) {
+            throw new Exception('Esta O.T. se originó de una cotización aprobada; esa misma cotización es la que se factura.');
+        }
 
         $calc   = Calculos::calcularCotizacion(
             (float)$ot['total_materiales'],
@@ -119,7 +131,7 @@ class CotizacionModel {
                    subtotal_con_soldymeg, subtotal_comercial, isv, total,
                    observaciones, ot_cliente, orden_compra,
                    elaborado_por, telefono_elaborado, estado)
-                VALUES (?,?,?,?,CURDATE(),?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pendiente')
+                VALUES (?,?,?,?,CURDATE(),?,?,?,?,?,?,?,?,?,?,?,?,?,?,'borrador')
             ");
             $stmt->execute([
                 $numero,
@@ -240,7 +252,7 @@ class CotizacionModel {
                    descuento_porcentaje, descuento_monto, total_con_descuento,
                    observaciones, ot_cliente, orden_compra, unidad,
                    elaborado_por, telefono_elaborado, estado)
-                VALUES (?,?,NULL,?,CURDATE(),?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pendiente')
+                VALUES (?,?,NULL,?,CURDATE(),?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'borrador')
             ");
             $stmt->execute([
                 $numero,
@@ -297,6 +309,88 @@ class CotizacionModel {
             $pdo->rollBack();
             throw $e;
         }
+    }
+
+    /** Estados en los que la cotización aún se puede editar. */
+    public static function editable(array $cot): bool { return $cot['estado'] === 'borrador'; }
+
+    /**
+     * Edita una cotización en borrador (ítems a precio de venta, descuentos, referencias).
+     * Cada ítem: descripcion, tipo, cantidad, precio_unitario (precio de venta), descuento_porcentaje|descuento_monto.
+     */
+    public static function editar(int $id, array $d): void {
+        $cot = self::obtener($id);
+        if (!$cot) throw new Exception('Cotización no encontrada.');
+        if (!self::editable($cot)) throw new Exception('Solo se puede editar una cotización en estado borrador.');
+        $items = $d['items'] ?? [];
+        if (empty($items)) throw new Exception('La cotización debe tener al menos un ítem.');
+
+        $totMat = 0; $totMO = 0; $totDescItems = 0; $filas = [];
+        foreach ($items as $it) {
+            $desc = trim((string)($it['descripcion'] ?? ''));
+            $cant = (float)($it['cantidad'] ?? 0); $pu = (float)($it['precio_unitario'] ?? -1);
+            if ($desc === '' || $cant <= 0 || $pu < 0) throw new Exception('Revisa los ítems: descripción, cantidad y precio son requeridos.');
+            $tipo = ($it['tipo'] ?? 'material') === 'mano_obra' ? 'mano_obra' : 'material';
+            $sub  = round($cant * $pu, 2);
+            $dpct = (float)($it['descuento_porcentaje'] ?? 0);
+            $dmto = $dpct > 0 ? round($sub * $dpct / 100, 2) : (float)($it['descuento_monto'] ?? 0);
+            $neto = max(0, round($sub - $dmto, 2));
+            $totDescItems += $dmto;
+            if ($tipo === 'mano_obra') $totMO += $neto; else $totMat += $neto;
+            $filas[] = [$tipo, $desc, $cant, $pu, $sub, $dpct, $dmto, $neto];
+        }
+        $calc = Calculos::calcularCotizacion($totMat, $totMO);
+        $gPct = (float)($d['descuento_porcentaje'] ?? 0);
+        $gMto = $gPct > 0 ? round($calc['total'] * $gPct / 100, 2) : (float)($d['descuento_monto'] ?? 0);
+        $totalDesc = max(0, round($calc['total'] - $gMto, 2));
+
+        $pdo = getDB(); $pdo->beginTransaction();
+        try {
+            $pdo->prepare("UPDATE cotizaciones SET vigencia_dias=?, subtotal_materiales=?, subtotal_mano_obra=?, costo_base=?, subtotal_con_soldymeg=?, subtotal_comercial=?, isv=?, total=?,
+                           descuento_porcentaje=?, descuento_monto=?, total_con_descuento=?, observaciones=?, ot_cliente=?, orden_compra=?, unidad=? WHERE id_cotizacion=?")
+                ->execute([max(1, min(90, (int)($d['vigencia_dias'] ?? $cot['vigencia_dias']))), $calc['subtotal_materiales'], $calc['subtotal_mano_obra'], $calc['costo_base'], $calc['subtotal_con_soldymeg'],
+                           $calc['subtotal_comercial'], $calc['isv'], $calc['total'], $gPct, round($totDescItems + $gMto, 2), $totalDesc,
+                           trim((string)($d['observaciones'] ?? '')), trim((string)($d['ot_cliente'] ?? '')) ?: null, trim((string)($d['orden_compra'] ?? '')) ?: null,
+                           trim((string)($d['unidad'] ?? '')) ?: null, $id]);
+            $pdo->prepare("DELETE FROM detalle_cotizacion WHERE cotizacion_id=?")->execute([$id]);
+            $ins = $pdo->prepare("INSERT INTO detalle_cotizacion (cotizacion_id, tipo, descripcion, cantidad, precio_unitario, subtotal_base, subtotal_final, descuento_porcentaje, descuento_monto, subtotal_con_descuento) VALUES (?,?,?,?,?,?,?,?,?,?)");
+            foreach ($filas as $f) $ins->execute([$id, $f[0], $f[1], $f[2], $f[3], $f[4], $f[4], $f[5], $f[6], $f[7]]);
+            $pdo->commit();
+        } catch (Throwable $e) { $pdo->rollBack(); throw $e; }
+    }
+
+    /**
+     * Cliente aprobó una cotización DIRECTA → se activa (crea) la O.T. en proceso.
+     * Devuelve ['id_orden'=>, 'numero_orden'=>] o null si no corresponde (ya existe OT o es post-trabajo).
+     */
+    public static function activarOT(int $cotId, int $usuarioId): ?array {
+        $cot = self::obtener($cotId);
+        if (!$cot || $cot['modo'] !== 'DIRECTA' || !empty($cot['ot_origen_id'])) return null;
+        $pdo = getDB();
+        $lineas = array_map(fn($d) => $d['descripcion'], $cot['detalle']);
+        $pdo->beginTransaction();
+        try {
+            $pdo->prepare("INSERT INTO ordenes_trabajo (numero_orden, fecha_apertura, cliente_id, usuario_id, placa, descripcion_trabajo, estado, cotizacion_origen_id, observaciones)
+                           VALUES ('TEMP', CURDATE(), ?, ?, ?, ?, 'en_proceso', ?, ?)")
+                ->execute([$cot['cliente_id'], $usuarioId, $cot['unidad'] ?: null, implode("\n", $lineas) ?: 'Trabajo según cotización ' . $cot['numero_cotizacion'], $cotId,
+                           'Activada por aprobación de la cotización ' . $cot['numero_cotizacion'] . ($cot['ot_cliente'] ? ' · OT cliente: ' . $cot['ot_cliente'] : '') . ($cot['orden_compra'] ? ' · OC: ' . $cot['orden_compra'] : '')]);
+            $ordenId = (int)$pdo->lastInsertId();
+            // Si la cotización vino de una Solicitud, la solicitud también apunta a la O.T.
+            try { $pdo->prepare("UPDATE solicitudes SET orden_id=? WHERE cotizacion_id=?")->execute([$ordenId, $cotId]); } catch (Throwable $e) {}
+            $pdo->commit();
+        } catch (Throwable $e) { $pdo->rollBack(); throw $e; }
+        $n = $pdo->prepare("SELECT numero_orden FROM ordenes_trabajo WHERE id_orden=?"); $n->execute([$ordenId]);
+        return ['id_orden' => $ordenId, 'numero_orden' => $n->fetchColumn()];
+    }
+
+    /** Motivo por el que NO se puede facturar todavía (O.T. de origen sin finalizar) o null si está libre. */
+    public static function bloqueoFacturacion(int $cotId): ?string {
+        $st = getDB()->prepare("SELECT numero_orden, estado FROM ordenes_trabajo WHERE cotizacion_origen_id=? AND estado <> 'anulada' ORDER BY id_orden DESC LIMIT 1");
+        $st->execute([$cotId]);
+        $ot = $st->fetch();
+        if ($ot && !in_array($ot['estado'], ['finalizada', 'cotizado', 'facturada'], true))
+            return "La {$ot['numero_orden']} aún no está finalizada. Al finalizarla se habilita la facturación.";
+        return null;
     }
 
     public static function cambiarEstado(int $id, string $estado, ?string $motivo_rechazo = null): bool {

@@ -101,6 +101,7 @@ class FacturacionService {
             if (!$cot) throw new Exception("Cotización #$cid no encontrada.");
             if ($cot['estado'] !== 'aprobada_cliente')
                 throw new Exception("Cotización {$cot['numero_cotizacion']} no está aprobada.");
+            if ($bloq = CotizacionModel::bloqueoFacturacion($cid)) throw new Exception($bloq);
             // Verificar que no tenga factura activa
             $chk = $pdo->prepare("SELECT id_factura FROM facturas WHERE cotizacion_id=? AND estado!='anulada' LIMIT 1");
             $chk->execute([$cid]);
@@ -177,6 +178,8 @@ class FacturacionService {
                 }
                 // Marcar cotización como facturada
                 $pdo->prepare("UPDATE cotizaciones SET estado='facturada' WHERE id_cotizacion=?")
+                    ->execute([$cot['id_cotizacion']]);
+                $pdo->prepare("UPDATE ordenes_trabajo SET estado='facturada' WHERE cotizacion_origen_id=? AND estado IN ('finalizada','cotizado')")
                     ->execute([$cot['id_cotizacion']]);
             }
 

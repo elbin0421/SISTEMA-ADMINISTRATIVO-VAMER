@@ -1,7 +1,7 @@
 <!-- MODAL COTIZACIÓN DIRECTA -->
 <div class="modal-bg" id="modalCotizacionDirecta">
   <div class="modal modal-lg">
-    <h4>📑 Nueva Cotización Directa</h4>
+    <h4 id="tituloCotDir">📑 Nueva Cotización Directa</h4>
     <div class="alert alert-error" id="errCotDir"></div>
     <div class="form-row">
       <div class="form-group">
@@ -105,7 +105,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="cerrarModal('modalCotizacionDirecta')">Cancelar</button>
-      <button class="btn btn-primary" onclick="guardarCotizacionDirecta()">💾 Generar Cotización</button>
+      <button class="btn btn-primary" id="btnGuardarCotDir" onclick="guardarCotizacionDirecta()">💾 Generar Cotización</button>
     </div>
   </div>
 </div>

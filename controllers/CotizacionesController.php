@@ -24,6 +24,7 @@ match(true) {
     $action === 'desde_ot'               && $method === 'POST' => desdeOT($sesion),
     $action === 'directa'                && $method === 'POST' => directa($sesion),
     $action === 'cambiar_estado'         && $method === 'POST' => cambiarEstado($sesion),
+    $action === 'editar'                 && $method === 'POST' => editar($sesion),
     $action === 'actualizar_referencias' && $method === 'POST' => actualizarReferencias($sesion),
     $action === 'previsualizar'          && $method === 'POST' => previsualizar(),
     default => responder(400, ['error' => 'Acción no válida'])
@@ -102,6 +103,19 @@ function cambiarEstado(array $sesion): void {
     try {
         $res = CotizacionService::cambiarEstado($id, $estado, $motivo ?: null, $sesion);
         responder(200, $res);
+    } catch (Exception $e) {
+        responder(400, ['error' => $e->getMessage()]);
+    }
+}
+
+function editar(array $sesion): void {
+    requirePermiso($sesion['rol_id'], 'cotizaciones', 'puede_editar');
+    $d  = json_decode(file_get_contents('php://input'), true) ?? [];
+    $id = (int)($d['id'] ?? 0);
+    if (!$id) { responder(400, ['error' => 'id requerido']); return; }
+    try {
+        CotizacionModel::editar($id, $d);
+        responder(200, ['ok' => true, 'cotizacion' => CotizacionModel::obtener($id)]);
     } catch (Exception $e) {
         responder(400, ['error' => $e->getMessage()]);
     }
